@@ -67,40 +67,6 @@ func NewRegistrarAPI(client *scw.Client) *RegistrarAPI {
 	}
 }
 
-type ContactCivility string
-
-const (
-	// ContactCivilityCivilityUnknown is [insert doc].
-	ContactCivilityCivilityUnknown = ContactCivility("civility_unknown")
-	// ContactCivilityMr is [insert doc].
-	ContactCivilityMr = ContactCivility("mr")
-	// ContactCivilityMrs is [insert doc].
-	ContactCivilityMrs = ContactCivility("mrs")
-)
-
-func (enum ContactCivility) String() string {
-	if enum == "" {
-		// return default value if empty
-		return "civility_unknown"
-	}
-	return string(enum)
-}
-
-func (enum ContactCivility) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
-}
-
-func (enum *ContactCivility) UnmarshalJSON(data []byte) error {
-	tmp := ""
-
-	if err := json.Unmarshal(data, &tmp); err != nil {
-		return err
-	}
-
-	*enum = ContactCivility(ContactCivility(tmp).String())
-	return nil
-}
-
 type ContactEmailStatus string
 
 const (
@@ -1046,10 +1012,6 @@ type Contact struct {
 	//
 	// Default value: legal_form_unknown
 	LegalForm ContactLegalForm `json:"legal_form"`
-	// Civility:
-	//
-	// Default value: civility_unknown
-	Civility ContactCivility `json:"civility"`
 
 	Firstname string `json:"firstname"`
 
@@ -1230,6 +1192,8 @@ type DSRecordDigest struct {
 	Type DSRecordDigestType `json:"type"`
 
 	Digest string `json:"digest"`
+
+	PublicKey *DSRecordPublicKey `json:"public_key"`
 }
 
 type DSRecordPublicKey struct {
@@ -1486,10 +1450,6 @@ type NewContact struct {
 	//
 	// Default value: legal_form_unknown
 	LegalForm ContactLegalForm `json:"legal_form"`
-	// Civility:
-	//
-	// Default value: civility_unknown
-	Civility ContactCivility `json:"civility"`
 
 	Firstname string `json:"firstname"`
 
@@ -1780,6 +1740,8 @@ type Tld struct {
 	IdnSupport bool `json:"idn_support"`
 
 	Offers map[string]*TldOffer `json:"offers"`
+
+	Specifications map[string]string `json:"specifications"`
 }
 
 type TldOffer struct {
@@ -2312,13 +2274,13 @@ type ImportRawDNSZoneRequest struct {
 	// DNSZone: the DNS zone to import
 	DNSZone string `json:"-"`
 	// Deprecated
-	Content string `json:"content"`
+	Content *string `json:"content,omitempty"`
 
 	ProjectID string `json:"project_id"`
 	// Deprecated: Format:
 	//
 	// Default value: unknown_raw_format
-	Format RawFormat `json:"format"`
+	Format *RawFormat `json:"format,omitempty"`
 	// BindSource: import a bind file format
 	// Precisely one of AxfrSource, BindSource must be set.
 	BindSource *ImportRawDNSZoneRequestBindSource `json:"bind_source,omitempty"`

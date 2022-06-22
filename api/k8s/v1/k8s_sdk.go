@@ -509,6 +509,40 @@ func (enum *PoolStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type PoolVolumeType string
+
+const (
+	// PoolVolumeTypeDefaultVolumeType is [insert doc].
+	PoolVolumeTypeDefaultVolumeType = PoolVolumeType("default_volume_type")
+	// PoolVolumeTypeLSSD is [insert doc].
+	PoolVolumeTypeLSSD = PoolVolumeType("l_ssd")
+	// PoolVolumeTypeBSSD is [insert doc].
+	PoolVolumeTypeBSSD = PoolVolumeType("b_ssd")
+)
+
+func (enum PoolVolumeType) String() string {
+	if enum == "" {
+		// return default value if empty
+		return "default_volume_type"
+	}
+	return string(enum)
+}
+
+func (enum PoolVolumeType) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
+}
+
+func (enum *PoolVolumeType) UnmarshalJSON(data []byte) error {
+	tmp := ""
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	*enum = PoolVolumeType(PoolVolumeType(tmp).String())
+	return nil
+}
+
 type Runtime string
 
 const (
@@ -584,11 +618,11 @@ type Cluster struct {
 	// AutoscalerConfig: the autoscaler config for the cluster
 	AutoscalerConfig *ClusterAutoscalerConfig `json:"autoscaler_config"`
 	// Deprecated: DashboardEnabled: the enablement of the Kubernetes Dashboard in the cluster
-	DashboardEnabled bool `json:"dashboard_enabled"`
+	DashboardEnabled *bool `json:"dashboard_enabled,omitempty"`
 	// Deprecated: Ingress: the ingress controller used in the cluster
 	//
 	// Default value: unknown_ingress
-	Ingress Ingress `json:"ingress"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 	// AutoUpgrade: the auo upgrade configuration of the cluster
 	AutoUpgrade *ClusterAutoUpgrade `json:"auto_upgrade"`
 	// UpgradeAvailable: true if a new Kubernetes version is available
@@ -783,6 +817,18 @@ type CreateClusterRequestPoolConfig struct {
 	UpgradePolicy *CreateClusterRequestPoolConfigUpgradePolicy `json:"upgrade_policy"`
 	// Zone: the Zone in which the Pool's node will be spawn in
 	Zone scw.Zone `json:"zone"`
+	// RootVolumeType: the system volume disk type
+	//
+	// The system volume disk type, we provide two different types of volume (`volume_type`):
+	//   - `l_ssd` is a local block storage: your system is stored locally on
+	//     the hypervisor of your node.
+	//   - `b_ssd` is a remote block storage: your system is stored on a
+	//     centralised and resilant cluster.
+	//
+	// Default value: default_volume_type
+	RootVolumeType PoolVolumeType `json:"root_volume_type"`
+	// RootVolumeSize: the system volume disk size
+	RootVolumeSize *scw.Size `json:"root_volume_size"`
 }
 
 // CreateClusterRequestPoolConfigUpgradePolicy: create cluster request. pool config. upgrade policy
@@ -925,6 +971,18 @@ type Pool struct {
 	UpgradePolicy *PoolUpgradePolicy `json:"upgrade_policy"`
 	// Zone: the Zone in which the Pool's node will be spawn in
 	Zone scw.Zone `json:"zone"`
+	// RootVolumeType: the system volume disk type
+	//
+	// The system volume disk type, we provide two different types of volume (`volume_type`):
+	//   - `l_ssd` is a local block storage: your system is stored locally on
+	//     the hypervisor of your node.
+	//   - `b_ssd` is a remote block storage: your system is stored on a
+	//     centralised and resilant cluster.
+	//
+	// Default value: default_volume_type
+	RootVolumeType PoolVolumeType `json:"root_volume_type"`
+	// RootVolumeSize: the system volume disk size
+	RootVolumeSize *scw.Size `json:"root_volume_size"`
 	// Region: the cluster region of the pool
 	Region scw.Region `json:"region"`
 }
@@ -1037,6 +1095,9 @@ type Version struct {
 // Service API
 
 type ListClustersRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// OrganizationID: the organization ID on which to filter the returned clusters
 	OrganizationID *string `json:"-"`
@@ -1107,6 +1168,9 @@ func (s *API) ListClusters(req *ListClustersRequest, opts ...scw.RequestOption) 
 }
 
 type CreateClusterRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// Deprecated: OrganizationID: the organization ID where the cluster will be created
 	// Precisely one of OrganizationID, ProjectID must be set.
@@ -1129,11 +1193,11 @@ type CreateClusterRequest struct {
 	// Default value: unknown_cni
 	Cni CNI `json:"cni"`
 	// Deprecated: EnableDashboard: the enablement of the Kubernetes Dashboard in the cluster
-	EnableDashboard bool `json:"enable_dashboard"`
+	EnableDashboard *bool `json:"enable_dashboard,omitempty"`
 	// Deprecated: Ingress: the Ingress Controller that will run in the cluster
 	//
 	// Default value: unknown_ingress
-	Ingress Ingress `json:"ingress"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 	// Pools: the pools to be created along with the cluster
 	Pools []*CreateClusterRequestPoolConfig `json:"pools"`
 	// AutoscalerConfig: the autoscaler config for the cluster
@@ -1206,6 +1270,9 @@ func (s *API) CreateCluster(req *CreateClusterRequest, opts ...scw.RequestOption
 }
 
 type GetClusterRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the requested cluster
 	ClusterID string `json:"-"`
@@ -1246,6 +1313,9 @@ func (s *API) GetCluster(req *GetClusterRequest, opts ...scw.RequestOption) (*Cl
 }
 
 type UpdateClusterRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster to update
 	ClusterID string `json:"-"`
@@ -1262,11 +1332,11 @@ type UpdateClusterRequest struct {
 	// This field allows to update some configuration for the autoscaler, which is an implementation of the [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler/).
 	AutoscalerConfig *UpdateClusterRequestAutoscalerConfig `json:"autoscaler_config"`
 	// Deprecated: EnableDashboard: the new value of the Kubernetes Dashboard enablement
-	EnableDashboard *bool `json:"enable_dashboard"`
+	EnableDashboard *bool `json:"enable_dashboard,omitempty"`
 	// Deprecated: Ingress: the new Ingress Controller for the cluster
 	//
 	// Default value: unknown_ingress
-	Ingress Ingress `json:"ingress"`
+	Ingress *Ingress `json:"ingress,omitempty"`
 	// AutoUpgrade: the new auo upgrade configuration of the cluster
 	//
 	// The new auo upgrade configuration of the cluster. Note that all the fields needs to be set.
@@ -1323,6 +1393,9 @@ func (s *API) UpdateCluster(req *UpdateClusterRequest, opts ...scw.RequestOption
 }
 
 type DeleteClusterRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster to delete
 	ClusterID string `json:"-"`
@@ -1369,6 +1442,9 @@ func (s *API) DeleteCluster(req *DeleteClusterRequest, opts ...scw.RequestOption
 }
 
 type UpgradeClusterRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster to upgrade
 	ClusterID string `json:"-"`
@@ -1422,6 +1498,9 @@ func (s *API) UpgradeCluster(req *UpgradeClusterRequest, opts ...scw.RequestOpti
 }
 
 type ListClusterAvailableVersionsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster which the available Kuberentes versions will be listed from
 	ClusterID string `json:"-"`
@@ -1462,6 +1541,9 @@ func (s *API) ListClusterAvailableVersions(req *ListClusterAvailableVersionsRequ
 }
 
 type GetClusterKubeConfigRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster to download the kubeconfig from
 	ClusterID string `json:"-"`
@@ -1503,6 +1585,9 @@ func (s *API) getClusterKubeConfig(req *GetClusterKubeConfigRequest, opts ...scw
 }
 
 type ResetClusterAdminTokenRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster of which the admin token will be renewed
 	ClusterID string `json:"-"`
@@ -1546,6 +1631,9 @@ func (s *API) ResetClusterAdminToken(req *ResetClusterAdminTokenRequest, opts ..
 }
 
 type ListPoolsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster from which the pools will be listed from
 	ClusterID string `json:"-"`
@@ -1613,6 +1701,9 @@ func (s *API) ListPools(req *ListPoolsRequest, opts ...scw.RequestOption) (*List
 }
 
 type CreatePoolRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the ID of the cluster in which the pool will be created
 	ClusterID string `json:"-"`
@@ -1650,6 +1741,18 @@ type CreatePoolRequest struct {
 	UpgradePolicy *CreatePoolRequestUpgradePolicy `json:"upgrade_policy"`
 	// Zone: the Zone in which the Pool's node will be spawn in
 	Zone scw.Zone `json:"zone"`
+	// RootVolumeType: the system volume disk type
+	//
+	// The system volume disk type, we provide two different types of volume (`volume_type`):
+	//   - `l_ssd` is a local block storage: your system is stored locally on
+	//     the hypervisor of your node.
+	//   - `b_ssd` is a remote block storage: your system is stored on a
+	//     centralised and resilant cluster.
+	//
+	// Default value: default_volume_type
+	RootVolumeType PoolVolumeType `json:"root_volume_type"`
+	// RootVolumeSize: the system volume disk size
+	RootVolumeSize *scw.Size `json:"root_volume_size"`
 }
 
 // CreatePool: create a new pool in a cluster
@@ -1701,6 +1804,9 @@ func (s *API) CreatePool(req *CreatePoolRequest, opts ...scw.RequestOption) (*Po
 }
 
 type GetPoolRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// PoolID: the ID of the requested pool
 	PoolID string `json:"-"`
@@ -1741,6 +1847,9 @@ func (s *API) GetPool(req *GetPoolRequest, opts ...scw.RequestOption) (*Pool, er
 }
 
 type UpgradePoolRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// PoolID: the ID of the pool to upgrade
 	PoolID string `json:"-"`
@@ -1788,6 +1897,9 @@ func (s *API) UpgradePool(req *UpgradePoolRequest, opts ...scw.RequestOption) (*
 }
 
 type UpdatePoolRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// PoolID: the ID of the pool to update
 	PoolID string `json:"-"`
@@ -1849,6 +1961,9 @@ func (s *API) UpdatePool(req *UpdatePoolRequest, opts ...scw.RequestOption) (*Po
 }
 
 type DeletePoolRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// PoolID: the ID of the pool to delete
 	PoolID string `json:"-"`
@@ -1889,6 +2004,9 @@ func (s *API) DeletePool(req *DeletePoolRequest, opts ...scw.RequestOption) (*Po
 }
 
 type ListNodesRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// ClusterID: the cluster ID from which the nodes will be listed from
 	ClusterID string `json:"-"`
@@ -1959,6 +2077,9 @@ func (s *API) ListNodes(req *ListNodesRequest, opts ...scw.RequestOption) (*List
 }
 
 type GetNodeRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// NodeID: the ID of the requested node
 	NodeID string `json:"-"`
@@ -1999,6 +2120,9 @@ func (s *API) GetNode(req *GetNodeRequest, opts ...scw.RequestOption) (*Node, er
 }
 
 type ReplaceNodeRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// NodeID: the ID of the node to replace
 	NodeID string `json:"-"`
@@ -2044,6 +2168,9 @@ func (s *API) ReplaceNode(req *ReplaceNodeRequest, opts ...scw.RequestOption) (*
 }
 
 type RebootNodeRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// NodeID: the ID of the node to reboot
 	NodeID string `json:"-"`
@@ -2088,7 +2215,50 @@ func (s *API) RebootNode(req *RebootNodeRequest, opts ...scw.RequestOption) (*No
 	return &resp, nil
 }
 
+type DeleteNodeRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+
+	NodeID string `json:"-"`
+}
+
+func (s *API) DeleteNode(req *DeleteNodeRequest, opts ...scw.RequestOption) (*Node, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.NodeID) == "" {
+		return nil, errors.New("field NodeID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "DELETE",
+		Path:    "/k8s/v1/regions/" + fmt.Sprint(req.Region) + "/nodes/" + fmt.Sprint(req.NodeID) + "",
+		Headers: http.Header{},
+	}
+
+	var resp Node
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 type ListVersionsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 }
 
@@ -2123,6 +2293,9 @@ func (s *API) ListVersions(req *ListVersionsRequest, opts ...scw.RequestOption) 
 }
 
 type GetVersionRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// VersionName: the requested version name
 	VersionName string `json:"-"`

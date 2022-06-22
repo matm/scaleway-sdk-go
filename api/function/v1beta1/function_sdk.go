@@ -184,6 +184,26 @@ const (
 	FunctionRuntimeNode10 = FunctionRuntime("node10")
 	// FunctionRuntimeNode14 is [insert doc].
 	FunctionRuntimeNode14 = FunctionRuntime("node14")
+	// FunctionRuntimeNode16 is [insert doc].
+	FunctionRuntimeNode16 = FunctionRuntime("node16")
+	// FunctionRuntimeNode17 is [insert doc].
+	FunctionRuntimeNode17 = FunctionRuntime("node17")
+	// FunctionRuntimePython37 is [insert doc].
+	FunctionRuntimePython37 = FunctionRuntime("python37")
+	// FunctionRuntimePython38 is [insert doc].
+	FunctionRuntimePython38 = FunctionRuntime("python38")
+	// FunctionRuntimePython39 is [insert doc].
+	FunctionRuntimePython39 = FunctionRuntime("python39")
+	// FunctionRuntimePython310 is [insert doc].
+	FunctionRuntimePython310 = FunctionRuntime("python310")
+	// FunctionRuntimeGo113 is [insert doc].
+	FunctionRuntimeGo113 = FunctionRuntime("go113")
+	// FunctionRuntimeGo117 is [insert doc].
+	FunctionRuntimeGo117 = FunctionRuntime("go117")
+	// FunctionRuntimeGo118 is [insert doc].
+	FunctionRuntimeGo118 = FunctionRuntime("go118")
+	// FunctionRuntimeNode18 is [insert doc].
+	FunctionRuntimeNode18 = FunctionRuntime("node18")
 )
 
 func (enum FunctionRuntime) String() string {
@@ -425,6 +445,38 @@ func (enum *ListNamespacesRequestOrderBy) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type ListTokensRequestOrderBy string
+
+const (
+	// ListTokensRequestOrderByCreatedAtAsc is [insert doc].
+	ListTokensRequestOrderByCreatedAtAsc = ListTokensRequestOrderBy("created_at_asc")
+	// ListTokensRequestOrderByCreatedAtDesc is [insert doc].
+	ListTokensRequestOrderByCreatedAtDesc = ListTokensRequestOrderBy("created_at_desc")
+)
+
+func (enum ListTokensRequestOrderBy) String() string {
+	if enum == "" {
+		// return default value if empty
+		return "created_at_asc"
+	}
+	return string(enum)
+}
+
+func (enum ListTokensRequestOrderBy) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
+}
+
+func (enum *ListTokensRequestOrderBy) UnmarshalJSON(data []byte) error {
+	tmp := ""
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	*enum = ListTokensRequestOrderBy(ListTokensRequestOrderBy(tmp).String())
+	return nil
+}
+
 type NamespaceStatus string
 
 const (
@@ -533,6 +585,44 @@ func (enum *RuntimeStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type TokenStatus string
+
+const (
+	// TokenStatusUnknown is [insert doc].
+	TokenStatusUnknown = TokenStatus("unknown")
+	// TokenStatusReady is [insert doc].
+	TokenStatusReady = TokenStatus("ready")
+	// TokenStatusDeleting is [insert doc].
+	TokenStatusDeleting = TokenStatus("deleting")
+	// TokenStatusError is [insert doc].
+	TokenStatusError = TokenStatus("error")
+	// TokenStatusCreating is [insert doc].
+	TokenStatusCreating = TokenStatus("creating")
+)
+
+func (enum TokenStatus) String() string {
+	if enum == "" {
+		// return default value if empty
+		return "unknown"
+	}
+	return string(enum)
+}
+
+func (enum TokenStatus) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
+}
+
+func (enum *TokenStatus) UnmarshalJSON(data []byte) error {
+	tmp := ""
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	*enum = TokenStatus(TokenStatus(tmp).String())
+	return nil
+}
+
 // Cron: cron
 type Cron struct {
 	ID string `json:"id"`
@@ -612,13 +702,13 @@ type Function struct {
 	SecretEnvironmentVariables []*SecretHashedValue `json:"secret_environment_variables"`
 
 	Region scw.Region `json:"region"`
-	// HTTPOption: configure how HTTP and HTTPS requests are handled
+	// Deprecated: HTTPOption: configure how HTTP and HTTPS requests are handled
 	//
 	// possible values:
 	//  - redirected: Responds to HTTP request with a 302 redirect to ask the clients to use HTTPS.
 	//  - enabled: Serve both HTTP and HTTPS traffic.
 	//
-	HTTPOption string `json:"http_option"`
+	HTTPOption *string `json:"http_option,omitempty"`
 
 	RuntimeMessage string `json:"runtime_message"`
 }
@@ -661,6 +751,12 @@ type ListLogsResponse struct {
 // ListNamespacesResponse: list namespaces response
 type ListNamespacesResponse struct {
 	Namespaces []*Namespace `json:"namespaces"`
+
+	TotalCount uint32 `json:"total_count"`
+}
+
+type ListTokensResponse struct {
+	Tokens []*Token `json:"tokens"`
 
 	TotalCount uint32 `json:"total_count"`
 }
@@ -721,6 +817,8 @@ type Runtime struct {
 	StatusMessage string `json:"status_message"`
 
 	Extension string `json:"extension"`
+
+	Implementation string `json:"implementation"`
 }
 
 type Secret struct {
@@ -737,8 +835,22 @@ type SecretHashedValue struct {
 
 type Token struct {
 	Token string `json:"token"`
+	// Deprecated
+	PublicKey *string `json:"public_key,omitempty"`
 
-	PublicKey string `json:"public_key"`
+	// Precisely one of FunctionID, NamespaceID must be set.
+	FunctionID *string `json:"function_id,omitempty"`
+
+	// Precisely one of FunctionID, NamespaceID must be set.
+	NamespaceID *string `json:"namespace_id,omitempty"`
+
+	ID string `json:"id"`
+	// Status:
+	//
+	// Default value: unknown
+	Status TokenStatus `json:"status"`
+
+	ExpiresAt *time.Time `json:"expires_at"`
 }
 
 // UploadURL: upload url
@@ -751,6 +863,9 @@ type UploadURL struct {
 // Service API
 
 type ListNamespacesRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Page *int32 `json:"-"`
@@ -811,6 +926,9 @@ func (s *API) ListNamespaces(req *ListNamespacesRequest, opts ...scw.RequestOpti
 }
 
 type GetNamespaceRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	NamespaceID string `json:"-"`
@@ -851,6 +969,9 @@ func (s *API) GetNamespace(req *GetNamespaceRequest, opts ...scw.RequestOption) 
 }
 
 type CreateNamespaceRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Name string `json:"name"`
@@ -907,6 +1028,9 @@ func (s *API) CreateNamespace(req *CreateNamespaceRequest, opts ...scw.RequestOp
 }
 
 type UpdateNamespaceRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	NamespaceID string `json:"-"`
@@ -958,6 +1082,9 @@ func (s *API) UpdateNamespace(req *UpdateNamespaceRequest, opts ...scw.RequestOp
 }
 
 type DeleteNamespaceRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	NamespaceID string `json:"-"`
@@ -998,6 +1125,9 @@ func (s *API) DeleteNamespace(req *DeleteNamespaceRequest, opts ...scw.RequestOp
 }
 
 type ListFunctionsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Page *int32 `json:"-"`
@@ -1061,6 +1191,9 @@ func (s *API) ListFunctions(req *ListFunctionsRequest, opts ...scw.RequestOption
 }
 
 type GetFunctionRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1101,6 +1234,9 @@ func (s *API) GetFunction(req *GetFunctionRequest, opts ...scw.RequestOption) (*
 }
 
 type CreateFunctionRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Name string `json:"name"`
@@ -1130,13 +1266,13 @@ type CreateFunctionRequest struct {
 	Description *string `json:"description"`
 
 	SecretEnvironmentVariables []*Secret `json:"secret_environment_variables"`
-	// HTTPOption: configure how HTTP and HTTPS requests are handled
+	// Deprecated: HTTPOption: configure how HTTP and HTTPS requests are handled
 	//
 	// possible values:
 	//  - redirected: Responds to HTTP request with a 302 redirect to ask the clients to use HTTPS.
 	//  - enabled: Serve both HTTP and HTTPS traffic.
 	//
-	HTTPOption *string `json:"http_option"`
+	HTTPOption *string `json:"http_option,omitempty"`
 }
 
 // CreateFunction: create a new function
@@ -1177,6 +1313,9 @@ func (s *API) CreateFunction(req *CreateFunctionRequest, opts ...scw.RequestOpti
 }
 
 type UpdateFunctionRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1186,6 +1325,10 @@ type UpdateFunctionRequest struct {
 	MinScale *uint32 `json:"min_scale"`
 
 	MaxScale *uint32 `json:"max_scale"`
+	// Runtime:
+	//
+	// Default value: unknown_runtime
+	Runtime FunctionRuntime `json:"runtime"`
 
 	MemoryLimit *uint32 `json:"memory_limit"`
 
@@ -1202,13 +1345,13 @@ type UpdateFunctionRequest struct {
 	Description *string `json:"description"`
 
 	SecretEnvironmentVariables []*Secret `json:"secret_environment_variables"`
-	// HTTPOption: configure how HTTP and HTTPS requests are handled
+	// Deprecated: HTTPOption: configure how HTTP and HTTPS requests are handled
 	//
 	// possible values:
 	//  - redirected: Responds to HTTP request with a 302 redirect to ask the clients to use HTTPS.
 	//  - enabled: Serve both HTTP and HTTPS traffic.
 	//
-	HTTPOption *string `json:"http_option"`
+	HTTPOption *string `json:"http_option,omitempty"`
 }
 
 // UpdateFunction: update an existing function
@@ -1251,6 +1394,9 @@ func (s *API) UpdateFunction(req *UpdateFunctionRequest, opts ...scw.RequestOpti
 }
 
 type DeleteFunctionRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1291,6 +1437,9 @@ func (s *API) DeleteFunction(req *DeleteFunctionRequest, opts ...scw.RequestOpti
 }
 
 type DeployFunctionRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1336,6 +1485,9 @@ func (s *API) DeployFunction(req *DeployFunctionRequest, opts ...scw.RequestOpti
 }
 
 type ListFunctionRuntimesRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 }
 
@@ -1370,6 +1522,9 @@ func (s *API) ListFunctionRuntimes(req *ListFunctionRuntimesRequest, opts ...scw
 }
 
 type GetFunctionUploadURLRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1416,6 +1571,9 @@ func (s *API) GetFunctionUploadURL(req *GetFunctionUploadURLRequest, opts ...scw
 }
 
 type GetFunctionDownloadURLRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1456,6 +1614,9 @@ func (s *API) GetFunctionDownloadURL(req *GetFunctionDownloadURLRequest, opts ..
 }
 
 type ListCronsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Page *int32 `json:"-"`
@@ -1510,6 +1671,9 @@ func (s *API) ListCrons(req *ListCronsRequest, opts ...scw.RequestOption) (*List
 }
 
 type GetCronRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	CronID string `json:"-"`
@@ -1550,6 +1714,9 @@ func (s *API) GetCron(req *GetCronRequest, opts ...scw.RequestOption) (*Cron, er
 }
 
 type CreateCronRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"function_id"`
@@ -1593,6 +1760,9 @@ func (s *API) CreateCron(req *CreateCronRequest, opts ...scw.RequestOption) (*Cr
 }
 
 type UpdateCronRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	CronID string `json:"-"`
@@ -1644,6 +1814,9 @@ func (s *API) UpdateCron(req *UpdateCronRequest, opts ...scw.RequestOption) (*Cr
 }
 
 type DeleteCronRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	CronID string `json:"-"`
@@ -1684,6 +1857,9 @@ func (s *API) DeleteCron(req *DeleteCronRequest, opts ...scw.RequestOption) (*Cr
 }
 
 type ListLogsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID string `json:"-"`
@@ -1741,6 +1917,9 @@ func (s *API) ListLogs(req *ListLogsRequest, opts ...scw.RequestOption) (*ListLo
 }
 
 type ListDomainsRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Page *int32 `json:"-"`
@@ -1794,6 +1973,9 @@ func (s *API) ListDomains(req *ListDomainsRequest, opts ...scw.RequestOption) (*
 }
 
 type GetDomainRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	DomainID string `json:"-"`
@@ -1831,6 +2013,9 @@ func (s *API) GetDomain(req *GetDomainRequest, opts ...scw.RequestOption) (*Doma
 }
 
 type CreateDomainRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	Hostname string `json:"hostname"`
@@ -1871,6 +2056,9 @@ func (s *API) CreateDomain(req *CreateDomainRequest, opts ...scw.RequestOption) 
 }
 
 type DeleteDomainRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	DomainID string `json:"-"`
@@ -1908,6 +2096,9 @@ func (s *API) DeleteDomain(req *DeleteDomainRequest, opts ...scw.RequestOption) 
 }
 
 type IssueJWTRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 
 	FunctionID *string `json:"-"`
@@ -1917,6 +2108,7 @@ type IssueJWTRequest struct {
 	ExpiresAt *time.Time `json:"-"`
 }
 
+// Deprecated
 func (s *API) IssueJWT(req *IssueJWTRequest, opts ...scw.RequestOption) (*Token, error) {
 	var err error
 
@@ -1938,6 +2130,192 @@ func (s *API) IssueJWT(req *IssueJWTRequest, opts ...scw.RequestOption) (*Token,
 		Method:  "GET",
 		Path:    "/functions/v1beta1/regions/" + fmt.Sprint(req.Region) + "/issue-jwt",
 		Query:   query,
+		Headers: http.Header{},
+	}
+
+	var resp Token
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type CreateTokenRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+
+	// Precisely one of FunctionID, NamespaceID must be set.
+	FunctionID *string `json:"function_id,omitempty"`
+
+	// Precisely one of FunctionID, NamespaceID must be set.
+	NamespaceID *string `json:"namespace_id,omitempty"`
+
+	ExpiresAt *time.Time `json:"expires_at"`
+}
+
+func (s *API) CreateToken(req *CreateTokenRequest, opts ...scw.RequestOption) (*Token, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/functions/v1beta1/regions/" + fmt.Sprint(req.Region) + "/tokens",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp Token
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type GetTokenRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+
+	TokenID string `json:"-"`
+}
+
+func (s *API) GetToken(req *GetTokenRequest, opts ...scw.RequestOption) (*Token, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.TokenID) == "" {
+		return nil, errors.New("field TokenID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "GET",
+		Path:    "/functions/v1beta1/regions/" + fmt.Sprint(req.Region) + "/tokens/" + fmt.Sprint(req.TokenID) + "",
+		Headers: http.Header{},
+	}
+
+	var resp Token
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type ListTokensRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+
+	Page *int32 `json:"-"`
+
+	PageSize *uint32 `json:"-"`
+	// OrderBy:
+	//
+	// Default value: created_at_asc
+	OrderBy ListTokensRequestOrderBy `json:"-"`
+
+	FunctionID *string `json:"-"`
+
+	NamespaceID *string `json:"-"`
+}
+
+func (s *API) ListTokens(req *ListTokensRequest, opts ...scw.RequestOption) (*ListTokensResponse, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	defaultPageSize, exist := s.client.GetDefaultPageSize()
+	if (req.PageSize == nil || *req.PageSize == 0) && exist {
+		req.PageSize = &defaultPageSize
+	}
+
+	query := url.Values{}
+	parameter.AddToQuery(query, "page", req.Page)
+	parameter.AddToQuery(query, "page_size", req.PageSize)
+	parameter.AddToQuery(query, "order_by", req.OrderBy)
+	parameter.AddToQuery(query, "function_id", req.FunctionID)
+	parameter.AddToQuery(query, "namespace_id", req.NamespaceID)
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "GET",
+		Path:    "/functions/v1beta1/regions/" + fmt.Sprint(req.Region) + "/tokens",
+		Query:   query,
+		Headers: http.Header{},
+	}
+
+	var resp ListTokensResponse
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type DeleteTokenRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+
+	TokenID string `json:"-"`
+}
+
+func (s *API) DeleteToken(req *DeleteTokenRequest, opts ...scw.RequestOption) (*Token, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.TokenID) == "" {
+		return nil, errors.New("field TokenID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "DELETE",
+		Path:    "/functions/v1beta1/regions/" + fmt.Sprint(req.Region) + "/tokens/" + fmt.Sprint(req.TokenID) + "",
 		Headers: http.Header{},
 	}
 
@@ -2043,4 +2421,23 @@ func (r *ListDomainsResponse) UnsafeAppend(res interface{}) (uint32, error) {
 	r.Domains = append(r.Domains, results.Domains...)
 	r.TotalCount += uint32(len(results.Domains))
 	return uint32(len(results.Domains)), nil
+}
+
+// UnsafeGetTotalCount should not be used
+// Internal usage only
+func (r *ListTokensResponse) UnsafeGetTotalCount() uint32 {
+	return r.TotalCount
+}
+
+// UnsafeAppend should not be used
+// Internal usage only
+func (r *ListTokensResponse) UnsafeAppend(res interface{}) (uint32, error) {
+	results, ok := res.(*ListTokensResponse)
+	if !ok {
+		return 0, errors.New("%T type cannot be appended to type %T", res, r)
+	}
+
+	r.Tokens = append(r.Tokens, results.Tokens...)
+	r.TotalCount += uint32(len(results.Tokens))
+	return uint32(len(results.Tokens)), nil
 }

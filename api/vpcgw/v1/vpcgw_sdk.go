@@ -563,6 +563,8 @@ type Gateway struct {
 	BastionEnabled bool `json:"bastion_enabled"`
 	// BastionPort: port of the SSH bastion
 	BastionPort uint32 `json:"bastion_port"`
+	// SMTPEnabled: whether SMTP traffic is allowed to pass through the gateway
+	SMTPEnabled bool `json:"smtp_enabled"`
 	// Zone: zone the gateway is available in
 	Zone scw.Zone `json:"zone"`
 }
@@ -755,6 +757,9 @@ type SetPATRulesResponse struct {
 // Service API
 
 type ListGatewaysRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: order in which to return results
 	//
@@ -829,6 +834,9 @@ func (s *API) ListGateways(req *ListGatewaysRequest, opts ...scw.RequestOption) 
 }
 
 type GetGatewayRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: ID of the gateway to fetch
 	GatewayID string `json:"-"`
@@ -867,6 +875,9 @@ func (s *API) GetGateway(req *GetGatewayRequest, opts ...scw.RequestOption) (*Ga
 }
 
 type CreateGatewayRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// ProjectID: project to create the gateway into
 	ProjectID string `json:"project_id"`
@@ -880,6 +891,12 @@ type CreateGatewayRequest struct {
 	UpstreamDNSServers []string `json:"upstream_dns_servers"`
 	// IPID: attach an existing IP to the gateway
 	IPID *string `json:"ip_id"`
+	// EnableSMTP: allow SMTP traffic to pass through the gateway
+	EnableSMTP bool `json:"enable_smtp"`
+	// EnableBastion: enable SSH bastion on the gateway
+	EnableBastion bool `json:"enable_bastion"`
+	// BastionPort: port of the SSH bastion
+	BastionPort *uint32 `json:"bastion_port"`
 }
 
 // CreateGateway: create a VPC Public Gateway
@@ -925,6 +942,9 @@ func (s *API) CreateGateway(req *CreateGatewayRequest, opts ...scw.RequestOption
 }
 
 type UpdateGatewayRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: ID of the gateway to update
 	GatewayID string `json:"-"`
@@ -938,6 +958,8 @@ type UpdateGatewayRequest struct {
 	EnableBastion *bool `json:"enable_bastion"`
 	// BastionPort: port of the SSH bastion
 	BastionPort *uint32 `json:"bastion_port"`
+	// EnableSMTP: allow SMTP traffic to pass through the gateway
+	EnableSMTP *bool `json:"enable_smtp"`
 }
 
 // UpdateGateway: update a VPC Public Gateway
@@ -978,6 +1000,9 @@ func (s *API) UpdateGateway(req *UpdateGatewayRequest, opts ...scw.RequestOption
 }
 
 type DeleteGatewayRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: ID of the gateway to delete
 	GatewayID string `json:"-"`
@@ -1023,6 +1048,9 @@ func (s *API) DeleteGateway(req *DeleteGatewayRequest, opts ...scw.RequestOption
 }
 
 type UpgradeGatewayRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: ID of the gateway to upgrade
 	GatewayID string `json:"-"`
@@ -1066,6 +1094,9 @@ func (s *API) UpgradeGateway(req *UpgradeGatewayRequest, opts ...scw.RequestOpti
 }
 
 type ListGatewayNetworksRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: order in which to return results
 	//
@@ -1134,6 +1165,9 @@ func (s *API) ListGatewayNetworks(req *ListGatewayNetworksRequest, opts ...scw.R
 }
 
 type GetGatewayNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayNetworkID: ID of the GatewayNetwork to fetch
 	GatewayNetworkID string `json:"-"`
@@ -1172,6 +1206,9 @@ func (s *API) GetGatewayNetwork(req *GetGatewayNetworkRequest, opts ...scw.Reque
 }
 
 type CreateGatewayNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: gateway to connect
 	GatewayID string `json:"gateway_id"`
@@ -1226,6 +1263,9 @@ func (s *API) CreateGatewayNetwork(req *CreateGatewayNetworkRequest, opts ...scw
 }
 
 type UpdateGatewayNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayNetworkID: ID of the GatewayNetwork to update
 	GatewayNetworkID string `json:"-"`
@@ -1279,6 +1319,9 @@ func (s *API) UpdateGatewayNetwork(req *UpdateGatewayNetworkRequest, opts ...scw
 }
 
 type DeleteGatewayNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayNetworkID: gatewayNetwork to delete
 	GatewayNetworkID string `json:"-"`
@@ -1324,6 +1367,9 @@ func (s *API) DeleteGatewayNetwork(req *DeleteGatewayNetworkRequest, opts ...scw
 }
 
 type ListDHCPsRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: order in which to return results
 	//
@@ -1387,6 +1433,9 @@ func (s *API) ListDHCPs(req *ListDHCPsRequest, opts ...scw.RequestOption) (*List
 }
 
 type GetDHCPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// DHCPID: ID of the DHCP config to fetch
 	DHCPID string `json:"-"`
@@ -1425,6 +1474,9 @@ func (s *API) GetDHCP(req *GetDHCPRequest, opts ...scw.RequestOption) (*DHCP, er
 }
 
 type CreateDHCPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// ProjectID: project to create the DHCP configuration in
 	ProjectID string `json:"project_id"`
@@ -1516,6 +1568,9 @@ func (s *API) CreateDHCP(req *CreateDHCPRequest, opts ...scw.RequestOption) (*DH
 }
 
 type UpdateDHCPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// DHCPID: DHCP config to update
 	DHCPID string `json:"-"`
@@ -1598,6 +1653,9 @@ func (s *API) UpdateDHCP(req *UpdateDHCPRequest, opts ...scw.RequestOption) (*DH
 }
 
 type DeleteDHCPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// DHCPID: DHCP config id to delete
 	DHCPID string `json:"-"`
@@ -1634,6 +1692,9 @@ func (s *API) DeleteDHCP(req *DeleteDHCPRequest, opts ...scw.RequestOption) erro
 }
 
 type ListDHCPEntriesRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: order in which to return results
 	//
@@ -1702,6 +1763,9 @@ func (s *API) ListDHCPEntries(req *ListDHCPEntriesRequest, opts ...scw.RequestOp
 }
 
 type GetDHCPEntryRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// DHCPEntryID: ID of the DHCP entry to fetch
 	DHCPEntryID string `json:"-"`
@@ -1740,6 +1804,9 @@ func (s *API) GetDHCPEntry(req *GetDHCPEntryRequest, opts ...scw.RequestOption) 
 }
 
 type CreateDHCPEntryRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayNetworkID: gatewayNetwork on which to create a DHCP reservation
 	GatewayNetworkID string `json:"gateway_network_id"`
@@ -1783,6 +1850,9 @@ func (s *API) CreateDHCPEntry(req *CreateDHCPEntryRequest, opts ...scw.RequestOp
 }
 
 type UpdateDHCPEntryRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// DHCPEntryID: DHCP entry ID to update
 	DHCPEntryID string `json:"-"`
@@ -1828,6 +1898,9 @@ func (s *API) UpdateDHCPEntry(req *UpdateDHCPEntryRequest, opts ...scw.RequestOp
 }
 
 type SetDHCPEntriesRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayNetworkID: gateway Network on which to set DHCP reservation list
 	GatewayNetworkID string `json:"gateway_network_id"`
@@ -1872,6 +1945,9 @@ func (s *API) SetDHCPEntries(req *SetDHCPEntriesRequest, opts ...scw.RequestOpti
 }
 
 type DeleteDHCPEntryRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// DHCPEntryID: DHCP entry ID to delete
 	DHCPEntryID string `json:"-"`
@@ -1908,6 +1984,9 @@ func (s *API) DeleteDHCPEntry(req *DeleteDHCPEntryRequest, opts ...scw.RequestOp
 }
 
 type ListPATRulesRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: order in which to return results
 	//
@@ -1970,6 +2049,9 @@ func (s *API) ListPATRules(req *ListPATRulesRequest, opts ...scw.RequestOption) 
 }
 
 type GetPATRuleRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// PatRuleID: pAT rule to get
 	PatRuleID string `json:"-"`
@@ -2008,6 +2090,9 @@ func (s *API) GetPATRule(req *GetPATRuleRequest, opts ...scw.RequestOption) (*PA
 }
 
 type CreatePATRuleRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: gateway on which to attach the rule to
 	GatewayID string `json:"gateway_id"`
@@ -2057,6 +2142,9 @@ func (s *API) CreatePATRule(req *CreatePATRuleRequest, opts ...scw.RequestOption
 }
 
 type UpdatePATRuleRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// PatRuleID: pAT rule to update
 	PatRuleID string `json:"-"`
@@ -2110,6 +2198,9 @@ func (s *API) UpdatePATRule(req *UpdatePATRuleRequest, opts ...scw.RequestOption
 }
 
 type SetPATRulesRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// GatewayID: gateway on which to set the PAT rules
 	GatewayID string `json:"gateway_id"`
@@ -2154,6 +2245,9 @@ func (s *API) SetPATRules(req *SetPATRulesRequest, opts ...scw.RequestOption) (*
 }
 
 type DeletePATRuleRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// PatRuleID: pAT rule to delete
 	PatRuleID string `json:"-"`
@@ -2190,6 +2284,9 @@ func (s *API) DeletePATRule(req *DeletePATRuleRequest, opts ...scw.RequestOption
 }
 
 type ListGatewayTypesRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 }
 
@@ -2222,6 +2319,9 @@ func (s *API) ListGatewayTypes(req *ListGatewayTypesRequest, opts ...scw.Request
 }
 
 type ListIPsRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: order in which to return results
 	//
@@ -2288,6 +2388,9 @@ func (s *API) ListIPs(req *ListIPsRequest, opts ...scw.RequestOption) (*ListIPsR
 }
 
 type GetIPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// IPID: ID of the IP to get
 	IPID string `json:"-"`
@@ -2326,6 +2429,9 @@ func (s *API) GetIP(req *GetIPRequest, opts ...scw.RequestOption) (*IP, error) {
 }
 
 type CreateIPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// ProjectID: project to create the IP into
 	ProjectID string `json:"project_id"`
@@ -2372,6 +2478,9 @@ func (s *API) CreateIP(req *CreateIPRequest, opts ...scw.RequestOption) (*IP, er
 }
 
 type UpdateIPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// IPID: ID of the IP to update
 	IPID string `json:"-"`
@@ -2421,6 +2530,9 @@ func (s *API) UpdateIP(req *UpdateIPRequest, opts ...scw.RequestOption) (*IP, er
 }
 
 type DeleteIPRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// IPID: ID of the IP to delete
 	IPID string `json:"-"`
@@ -2457,6 +2569,9 @@ func (s *API) DeleteIP(req *DeleteIPRequest, opts ...scw.RequestOption) error {
 }
 
 type RefreshSSHKeysRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 
 	GatewayID string `json:"-"`

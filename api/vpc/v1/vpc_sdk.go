@@ -111,11 +111,16 @@ type PrivateNetwork struct {
 	CreatedAt *time.Time `json:"created_at"`
 	// UpdatedAt: the last private network modification date
 	UpdatedAt *time.Time `json:"updated_at"`
+	// Subnets: private network subnets CIDR
+	Subnets []scw.IPNet `json:"subnets"`
 }
 
 // Service API
 
 type ListPrivateNetworksRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// OrderBy: the sort order of the returned private networks
 	//
@@ -179,6 +184,9 @@ func (s *API) ListPrivateNetworks(req *ListPrivateNetworksRequest, opts ...scw.R
 }
 
 type CreatePrivateNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// Name: the name of the private network
 	Name string `json:"name"`
@@ -186,6 +194,8 @@ type CreatePrivateNetworkRequest struct {
 	ProjectID string `json:"project_id"`
 	// Tags: the private networks tags
 	Tags []string `json:"tags"`
+	// Subnets: private network subnets CIDR
+	Subnets []scw.IPNet `json:"subnets"`
 }
 
 // CreatePrivateNetwork: create a private network
@@ -231,6 +241,9 @@ func (s *API) CreatePrivateNetwork(req *CreatePrivateNetworkRequest, opts ...scw
 }
 
 type GetPrivateNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// PrivateNetworkID: the private network id
 	PrivateNetworkID string `json:"-"`
@@ -269,6 +282,9 @@ func (s *API) GetPrivateNetwork(req *GetPrivateNetworkRequest, opts ...scw.Reque
 }
 
 type UpdatePrivateNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// PrivateNetworkID: the private network ID
 	PrivateNetworkID string `json:"-"`
@@ -276,6 +292,8 @@ type UpdatePrivateNetworkRequest struct {
 	Name *string `json:"name"`
 	// Tags: the private networks tags
 	Tags *[]string `json:"tags"`
+	// Subnets: private network subnets CIDR
+	Subnets *[]string `json:"subnets"`
 }
 
 // UpdatePrivateNetwork: update private network
@@ -316,6 +334,9 @@ func (s *API) UpdatePrivateNetwork(req *UpdatePrivateNetworkRequest, opts ...scw
 }
 
 type DeletePrivateNetworkRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
 	// PrivateNetworkID: the private network ID
 	PrivateNetworkID string `json:"-"`
