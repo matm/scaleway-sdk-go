@@ -513,6 +513,42 @@ func (enum *DomainStatus) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type HostStatus string
+
+const (
+	// HostStatusUnknownStatus is [insert doc].
+	HostStatusUnknownStatus = HostStatus("unknown_status")
+	// HostStatusActive is [insert doc].
+	HostStatusActive = HostStatus("active")
+	// HostStatusUpdating is [insert doc].
+	HostStatusUpdating = HostStatus("updating")
+	// HostStatusDeleting is [insert doc].
+	HostStatusDeleting = HostStatus("deleting")
+)
+
+func (enum HostStatus) String() string {
+	if enum == "" {
+		// return default value if empty
+		return "unknown_status"
+	}
+	return string(enum)
+}
+
+func (enum HostStatus) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
+}
+
+func (enum *HostStatus) UnmarshalJSON(data []byte) error {
+	tmp := ""
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	*enum = HostStatus(HostStatus(tmp).String())
+	return nil
+}
+
 type LanguageCode string
 
 const (
@@ -522,6 +558,8 @@ const (
 	LanguageCodeEnUS = LanguageCode("en_US")
 	// LanguageCodeFrFR is [insert doc].
 	LanguageCodeFrFR = LanguageCode("fr_FR")
+	// LanguageCodeDeDE is [insert doc].
+	LanguageCodeDeDE = LanguageCode("de_DE")
 )
 
 func (enum LanguageCode) String() string {
@@ -968,6 +1006,12 @@ const (
 	TaskTypeDeleteDomainExpired = TaskType("delete_domain_expired")
 	// TaskTypeDeleteExternalDomain is [insert doc].
 	TaskTypeDeleteExternalDomain = TaskType("delete_external_domain")
+	// TaskTypeCreateHost is [insert doc].
+	TaskTypeCreateHost = TaskType("create_host")
+	// TaskTypeUpdateHost is [insert doc].
+	TaskTypeUpdateHost = TaskType("update_host")
+	// TaskTypeDeleteHost is [insert doc].
+	TaskTypeDeleteHost = TaskType("delete_host")
 )
 
 func (enum TaskType) String() string {
@@ -999,6 +1043,23 @@ type AvailableDomain struct {
 	Available bool `json:"available"`
 
 	Tld *Tld `json:"tld"`
+}
+
+// CheckContactsCompatibilityResponse: check contacts compatibility response
+type CheckContactsCompatibilityResponse struct {
+	Compatible bool `json:"compatible"`
+
+	OwnerCheckResult *CheckContactsCompatibilityResponseContactCheckResult `json:"owner_check_result"`
+
+	AdministrativeCheckResult *CheckContactsCompatibilityResponseContactCheckResult `json:"administrative_check_result"`
+
+	TechnicalCheckResult *CheckContactsCompatibilityResponseContactCheckResult `json:"technical_check_result"`
+}
+
+type CheckContactsCompatibilityResponseContactCheckResult struct {
+	Compatible bool `json:"compatible"`
+
+	ErrorMessage *string `json:"error_message"`
 }
 
 // ClearDNSZoneRecordsResponse: clear dns zone records response
@@ -1046,8 +1107,8 @@ type Contact struct {
 	Lang LanguageCode `json:"lang"`
 
 	Resale bool `json:"resale"`
-
-	Questions []*ContactQuestion `json:"questions"`
+	// Deprecated
+	Questions *[]*ContactQuestion `json:"questions,omitempty"`
 
 	ExtensionFr *ContactExtensionFR `json:"extension_fr"`
 
@@ -1334,6 +1395,18 @@ type GetDomainAuthCodeResponse struct {
 	AuthCode string `json:"auth_code"`
 }
 
+type Host struct {
+	Domain string `json:"domain"`
+
+	Name string `json:"name"`
+
+	IPs []net.IP `json:"ips"`
+	// Status:
+	//
+	// Default value: unknown_status
+	Status HostStatus `json:"status"`
+}
+
 type ImportProviderDNSZoneRequestOnlineV1 struct {
 	Token string `json:"token"`
 }
@@ -1411,6 +1484,13 @@ type ListDNSZonesResponse struct {
 	DNSZones []*DNSZone `json:"dns_zones"`
 }
 
+// ListDomainHostsResponse: list domain hosts response
+type ListDomainHostsResponse struct {
+	TotalCount uint32 `json:"total_count"`
+
+	Hosts []*Host `json:"hosts"`
+}
+
 // ListDomainsResponse: list domains response
 type ListDomainsResponse struct {
 	TotalCount uint32 `json:"total_count"`
@@ -1484,8 +1564,8 @@ type NewContact struct {
 	Lang LanguageCode `json:"lang"`
 
 	Resale bool `json:"resale"`
-
-	Questions []*ContactQuestion `json:"questions"`
+	// Deprecated
+	Questions *[]*ContactQuestion `json:"questions,omitempty"`
 
 	ExtensionFr *ContactExtensionFR `json:"extension_fr"`
 
@@ -3047,6 +3127,61 @@ func (s *RegistrarAPI) DeleteExternalDomain(req *RegistrarAPIDeleteExternalDomai
 	return &resp, nil
 }
 
+type RegistrarAPICheckContactsCompatibilityRequest struct {
+
+	// Precisely one of Domain, Tld must be set.
+	Domain *string `json:"domain,omitempty"`
+
+	// Precisely one of Domain, Tld must be set.
+	Tld *string `json:"tld,omitempty"`
+
+	// Precisely one of OwnerContact, OwnerContactID must be set.
+	OwnerContactID *string `json:"owner_contact_id,omitempty"`
+
+	// Precisely one of OwnerContact, OwnerContactID must be set.
+	OwnerContact *NewContact `json:"owner_contact,omitempty"`
+
+	// Precisely one of AdministrativeContact, AdministrativeContactID must be set.
+	AdministrativeContactID *string `json:"administrative_contact_id,omitempty"`
+
+	// Precisely one of AdministrativeContact, AdministrativeContactID must be set.
+	AdministrativeContact *NewContact `json:"administrative_contact,omitempty"`
+
+	// Precisely one of TechnicalContact, TechnicalContactID must be set.
+	TechnicalContactID *string `json:"technical_contact_id,omitempty"`
+
+	// Precisely one of TechnicalContact, TechnicalContactID must be set.
+	TechnicalContact *NewContact `json:"technical_contact,omitempty"`
+}
+
+// CheckContactsCompatibility: check if contacts are compatible against a domain or a tld
+//
+// Check if contacts are compatible against a domain or a tld.
+// If not, it will return the information requiring a correction.
+//
+func (s *RegistrarAPI) CheckContactsCompatibility(req *RegistrarAPICheckContactsCompatibilityRequest, opts ...scw.RequestOption) (*CheckContactsCompatibilityResponse, error) {
+	var err error
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/domain/v2beta1/check-contacts-compatibility",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp CheckContactsCompatibilityResponse
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 type RegistrarAPIListContactsRequest struct {
 	Page *int32 `json:"-"`
 
@@ -3154,8 +3289,8 @@ type RegistrarAPIUpdateContactRequest struct {
 	Lang LanguageCode `json:"lang"`
 
 	Resale *bool `json:"resale"`
-
-	Questions []*UpdateContactRequestQuestion `json:"questions"`
+	// Deprecated
+	Questions *[]*UpdateContactRequestQuestion `json:"questions,omitempty"`
 
 	ExtensionFr *ContactExtensionFR `json:"extension_fr"`
 
@@ -3218,6 +3353,8 @@ type RegistrarAPIListDomainsRequest struct {
 	OrganizationID *string `json:"-"`
 
 	IsExternal *bool `json:"-"`
+
+	Domain *string `json:"-"`
 }
 
 // ListDomains: list domains
@@ -3240,6 +3377,7 @@ func (s *RegistrarAPI) ListDomains(req *RegistrarAPIListDomainsRequest, opts ...
 	parameter.AddToQuery(query, "project_id", req.ProjectID)
 	parameter.AddToQuery(query, "organization_id", req.OrganizationID)
 	parameter.AddToQuery(query, "is_external", req.IsExternal)
+	parameter.AddToQuery(query, "domain", req.Domain)
 
 	scwReq := &scw.ScalewayRequest{
 		Method:  "GET",
@@ -3645,6 +3783,8 @@ type RegistrarAPISearchAvailableDomainsRequest struct {
 	Domains []string `json:"-"`
 	// Tlds: array of tlds to search on
 	Tlds []string `json:"-"`
+	// StrictSearch: search exact match
+	StrictSearch bool `json:"-"`
 }
 
 // SearchAvailableDomains: search available domains
@@ -3659,6 +3799,7 @@ func (s *RegistrarAPI) SearchAvailableDomains(req *RegistrarAPISearchAvailableDo
 	query := url.Values{}
 	parameter.AddToQuery(query, "domains", req.Domains)
 	parameter.AddToQuery(query, "tlds", req.Tlds)
+	parameter.AddToQuery(query, "strict_search", req.StrictSearch)
 
 	scwReq := &scw.ScalewayRequest{
 		Method:  "GET",
@@ -3668,6 +3809,156 @@ func (s *RegistrarAPI) SearchAvailableDomains(req *RegistrarAPISearchAvailableDo
 	}
 
 	var resp SearchAvailableDomainsResponse
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type RegistrarAPICreateDomainHostRequest struct {
+	Domain string `json:"-"`
+
+	Name string `json:"name"`
+
+	IPs []net.IP `json:"ips"`
+}
+
+// CreateDomainHost: create domain hostname with glue IPs
+func (s *RegistrarAPI) CreateDomainHost(req *RegistrarAPICreateDomainHostRequest, opts ...scw.RequestOption) (*Host, error) {
+	var err error
+
+	if fmt.Sprint(req.Domain) == "" {
+		return nil, errors.New("field Domain cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/domain/v2beta1/domains/" + fmt.Sprint(req.Domain) + "/hosts",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp Host
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type RegistrarAPIListDomainHostsRequest struct {
+	Domain string `json:"-"`
+
+	Page *int32 `json:"-"`
+
+	PageSize *uint32 `json:"-"`
+}
+
+// ListDomainHosts: list domain hostnames with they glue IPs
+func (s *RegistrarAPI) ListDomainHosts(req *RegistrarAPIListDomainHostsRequest, opts ...scw.RequestOption) (*ListDomainHostsResponse, error) {
+	var err error
+
+	defaultPageSize, exist := s.client.GetDefaultPageSize()
+	if (req.PageSize == nil || *req.PageSize == 0) && exist {
+		req.PageSize = &defaultPageSize
+	}
+
+	query := url.Values{}
+	parameter.AddToQuery(query, "page", req.Page)
+	parameter.AddToQuery(query, "page_size", req.PageSize)
+
+	if fmt.Sprint(req.Domain) == "" {
+		return nil, errors.New("field Domain cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "GET",
+		Path:    "/domain/v2beta1/domains/" + fmt.Sprint(req.Domain) + "/hosts",
+		Query:   query,
+		Headers: http.Header{},
+	}
+
+	var resp ListDomainHostsResponse
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type RegistrarAPIUpdateDomainHostRequest struct {
+	Domain string `json:"-"`
+
+	Name string `json:"-"`
+
+	IPs *[]string `json:"ips"`
+}
+
+// UpdateDomainHost: update domain hostname with glue IPs
+func (s *RegistrarAPI) UpdateDomainHost(req *RegistrarAPIUpdateDomainHostRequest, opts ...scw.RequestOption) (*Host, error) {
+	var err error
+
+	if fmt.Sprint(req.Domain) == "" {
+		return nil, errors.New("field Domain cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.Name) == "" {
+		return nil, errors.New("field Name cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "PATCH",
+		Path:    "/domain/v2beta1/domains/" + fmt.Sprint(req.Domain) + "/hosts/" + fmt.Sprint(req.Name) + "",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp Host
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type RegistrarAPIDeleteDomainHostRequest struct {
+	Domain string `json:"-"`
+
+	Name string `json:"-"`
+}
+
+// DeleteDomainHost: delete domain hostname
+func (s *RegistrarAPI) DeleteDomainHost(req *RegistrarAPIDeleteDomainHostRequest, opts ...scw.RequestOption) (*Host, error) {
+	var err error
+
+	if fmt.Sprint(req.Domain) == "" {
+		return nil, errors.New("field Domain cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.Name) == "" {
+		return nil, errors.New("field Name cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "DELETE",
+		Path:    "/domain/v2beta1/domains/" + fmt.Sprint(req.Domain) + "/hosts/" + fmt.Sprint(req.Name) + "",
+		Headers: http.Header{},
+	}
+
+	var resp Host
 
 	err = s.client.Do(scwReq, &resp, opts...)
 	if err != nil {
@@ -3845,4 +4136,23 @@ func (r *ListRenewableDomainsResponse) UnsafeAppend(res interface{}) (uint32, er
 	r.Domains = append(r.Domains, results.Domains...)
 	r.TotalCount += uint32(len(results.Domains))
 	return uint32(len(results.Domains)), nil
+}
+
+// UnsafeGetTotalCount should not be used
+// Internal usage only
+func (r *ListDomainHostsResponse) UnsafeGetTotalCount() uint32 {
+	return r.TotalCount
+}
+
+// UnsafeAppend should not be used
+// Internal usage only
+func (r *ListDomainHostsResponse) UnsafeAppend(res interface{}) (uint32, error) {
+	results, ok := res.(*ListDomainHostsResponse)
+	if !ok {
+		return 0, errors.New("%T type cannot be appended to type %T", res, r)
+	}
+
+	r.Hosts = append(r.Hosts, results.Hosts...)
+	r.TotalCount += uint32(len(results.Hosts))
+	return uint32(len(results.Hosts)), nil
 }

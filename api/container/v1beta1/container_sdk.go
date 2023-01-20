@@ -51,6 +51,40 @@ func NewAPI(client *scw.Client) *API {
 	}
 }
 
+type ContainerHTTPOption string
+
+const (
+	// ContainerHTTPOptionUnknownHTTPOption is [insert doc].
+	ContainerHTTPOptionUnknownHTTPOption = ContainerHTTPOption("unknown_http_option")
+	// ContainerHTTPOptionEnabled is [insert doc].
+	ContainerHTTPOptionEnabled = ContainerHTTPOption("enabled")
+	// ContainerHTTPOptionRedirected is [insert doc].
+	ContainerHTTPOptionRedirected = ContainerHTTPOption("redirected")
+)
+
+func (enum ContainerHTTPOption) String() string {
+	if enum == "" {
+		// return default value if empty
+		return "unknown_http_option"
+	}
+	return string(enum)
+}
+
+func (enum ContainerHTTPOption) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
+}
+
+func (enum *ContainerHTTPOption) UnmarshalJSON(data []byte) error {
+	tmp := ""
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	*enum = ContainerHTTPOption(ContainerHTTPOption(tmp).String())
+	return nil
+}
+
 type ContainerPrivacy string
 
 const (
@@ -449,6 +483,40 @@ func (enum *ListTokensRequestOrderBy) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type LogStream string
+
+const (
+	// LogStreamUnknown is [insert doc].
+	LogStreamUnknown = LogStream("unknown")
+	// LogStreamStdout is [insert doc].
+	LogStreamStdout = LogStream("stdout")
+	// LogStreamStderr is [insert doc].
+	LogStreamStderr = LogStream("stderr")
+)
+
+func (enum LogStream) String() string {
+	if enum == "" {
+		// return default value if empty
+		return "unknown"
+	}
+	return string(enum)
+}
+
+func (enum LogStream) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, enum)), nil
+}
+
+func (enum *LogStream) UnmarshalJSON(data []byte) error {
+	tmp := ""
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	*enum = LogStream(LogStream(tmp).String())
+	return nil
+}
+
 type NamespaceStatus string
 
 const (
@@ -604,13 +672,14 @@ type Container struct {
 	Port uint32 `json:"port"`
 
 	SecretEnvironmentVariables []*SecretHashedValue `json:"secret_environment_variables"`
-	// Deprecated: HTTPOption: configure how HTTP and HTTPS requests are handled
+	// HTTPOption: configure how HTTP and HTTPS requests are handled
 	//
 	// possible values:
 	//  - redirected: Responds to HTTP request with a 302 redirect to ask the clients to use HTTPS.
 	//  - enabled: Serve both HTTP and HTTPS traffic.
 	//
-	HTTPOption *string `json:"http_option,omitempty"`
+	// Default value: unknown_http_option
+	HTTPOption ContainerHTTPOption `json:"http_option"`
 
 	Region scw.Region `json:"region"`
 }
@@ -623,11 +692,13 @@ type Cron struct {
 
 	Schedule string `json:"schedule"`
 
-	Args []byte `json:"args"`
+	Args *scw.JSONObject `json:"args"`
 	// Status:
 	//
 	// Default value: unknown
 	Status CronStatus `json:"status"`
+
+	Name string `json:"name"`
 }
 
 // Domain: domain
@@ -695,6 +766,14 @@ type Log struct {
 	Timestamp *time.Time `json:"timestamp"`
 
 	ID string `json:"id"`
+	// Level: contains the severity of the log (info, debug, error, ...)
+	Level string `json:"level"`
+	// Source: source of the log (core runtime or user code)
+	Source string `json:"source"`
+	// Stream: can be stdout or stderr
+	//
+	// Default value: unknown
+	Stream LogStream `json:"stream"`
 }
 
 // Namespace: namespace
@@ -738,27 +817,35 @@ type SecretHashedValue struct {
 	HashedValue string `json:"hashed_value"`
 }
 
+// Token: token
 type Token struct {
+	ID string `json:"id"`
+
 	Token string `json:"token"`
-	// Deprecated
-	PublicKey *string `json:"public_key,omitempty"`
 
 	// Precisely one of ContainerID, NamespaceID must be set.
 	ContainerID *string `json:"container_id,omitempty"`
 
 	// Precisely one of ContainerID, NamespaceID must be set.
 	NamespaceID *string `json:"namespace_id,omitempty"`
-
-	ID string `json:"id"`
+	// Deprecated
+	PublicKey *string `json:"public_key,omitempty"`
 	// Status:
 	//
 	// Default value: unknown
 	Status TokenStatus `json:"status"`
 
+	Description *string `json:"description"`
+
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
 // Service API
+
+// Regions list localities the api is available in
+func (s *API) Regions() []scw.Region {
+	return []scw.Region{scw.RegionFrPar, scw.RegionNlAms, scw.RegionPlWaw}
+}
 
 type ListNamespacesRequest struct {
 	// Region:
@@ -1160,8 +1247,6 @@ type CreateContainerRequest struct {
 	RegistryImage *string `json:"registry_image"`
 
 	MaxConcurrency *uint32 `json:"max_concurrency"`
-
-	DomainName *string `json:"domain_name"`
 	// Protocol:
 	//
 	// Default value: unknown_protocol
@@ -1170,13 +1255,14 @@ type CreateContainerRequest struct {
 	Port *uint32 `json:"port"`
 
 	SecretEnvironmentVariables []*Secret `json:"secret_environment_variables"`
-	// Deprecated: HTTPOption: configure how HTTP and HTTPS requests are handled
+	// HTTPOption: configure how HTTP and HTTPS requests are handled
 	//
 	// possible values:
 	//  - redirected: Responds to HTTP request with a 302 redirect to ask the clients to use HTTPS.
 	//  - enabled: Serve both HTTP and HTTPS traffic.
 	//
-	HTTPOption *string `json:"http_option,omitempty"`
+	// Default value: unknown_http_option
+	HTTPOption ContainerHTTPOption `json:"http_option"`
 }
 
 // CreateContainer: create a new container
@@ -1245,8 +1331,6 @@ type UpdateContainerRequest struct {
 	RegistryImage *string `json:"registry_image"`
 
 	MaxConcurrency *uint32 `json:"max_concurrency"`
-
-	DomainName *string `json:"domain_name"`
 	// Protocol:
 	//
 	// Default value: unknown_protocol
@@ -1255,13 +1339,14 @@ type UpdateContainerRequest struct {
 	Port *uint32 `json:"port"`
 
 	SecretEnvironmentVariables []*Secret `json:"secret_environment_variables"`
-	// Deprecated: HTTPOption: configure how HTTP and HTTPS requests are handled
+	// HTTPOption: configure how HTTP and HTTPS requests are handled
 	//
 	// possible values:
 	//  - redirected: Responds to HTTP request with a 302 redirect to ask the clients to use HTTPS.
 	//  - enabled: Serve both HTTP and HTTPS traffic.
 	//
-	HTTPOption *string `json:"http_option,omitempty"`
+	// Default value: unknown_http_option
+	HTTPOption ContainerHTTPOption `json:"http_option"`
 }
 
 // UpdateContainer: update an existing container
@@ -1504,7 +1589,9 @@ type CreateCronRequest struct {
 
 	Schedule string `json:"schedule"`
 
-	Args []byte `json:"args"`
+	Args *scw.JSONObject `json:"args"`
+
+	Name *string `json:"name"`
 }
 
 // CreateCron: create a new cron
@@ -1552,7 +1639,9 @@ type UpdateCronRequest struct {
 
 	Schedule *string `json:"schedule"`
 
-	Args []byte `json:"args"`
+	Args *scw.JSONObject `json:"args"`
+
+	Name *string `json:"name"`
 }
 
 // UpdateCron: update an existing cron
@@ -1714,6 +1803,7 @@ type ListDomainsRequest struct {
 	ContainerID string `json:"-"`
 }
 
+// ListDomains: list all domain name bindings
 func (s *API) ListDomains(req *ListDomainsRequest, opts ...scw.RequestOption) (*ListDomainsResponse, error) {
 	var err error
 
@@ -1762,6 +1852,7 @@ type GetDomainRequest struct {
 	DomainID string `json:"-"`
 }
 
+// GetDomain: get a domain name binding
 func (s *API) GetDomain(req *GetDomainRequest, opts ...scw.RequestOption) (*Domain, error) {
 	var err error
 
@@ -1804,6 +1895,7 @@ type CreateDomainRequest struct {
 	ContainerID string `json:"container_id"`
 }
 
+// CreateDomain: create a domain name binding
 func (s *API) CreateDomain(req *CreateDomainRequest, opts ...scw.RequestOption) (*Domain, error) {
 	var err error
 
@@ -1845,6 +1937,7 @@ type DeleteDomainRequest struct {
 	DomainID string `json:"-"`
 }
 
+// DeleteDomain: delete a domain name binding
 func (s *API) DeleteDomain(req *DeleteDomainRequest, opts ...scw.RequestOption) (*Domain, error) {
 	var err error
 
@@ -1935,9 +2028,12 @@ type CreateTokenRequest struct {
 	// Precisely one of ContainerID, NamespaceID must be set.
 	NamespaceID *string `json:"namespace_id,omitempty"`
 
+	Description *string `json:"description"`
+
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
+// CreateToken: create a new revocable token
 func (s *API) CreateToken(req *CreateTokenRequest, opts ...scw.RequestOption) (*Token, error) {
 	var err error
 
@@ -1979,6 +2075,7 @@ type GetTokenRequest struct {
 	TokenID string `json:"-"`
 }
 
+// GetToken: get a token
 func (s *API) GetToken(req *GetTokenRequest, opts ...scw.RequestOption) (*Token, error) {
 	var err error
 
@@ -2029,6 +2126,7 @@ type ListTokensRequest struct {
 	NamespaceID *string `json:"-"`
 }
 
+// ListTokens: list all tokens
 func (s *API) ListTokens(req *ListTokensRequest, opts ...scw.RequestOption) (*ListTokensResponse, error) {
 	var err error
 
@@ -2078,6 +2176,7 @@ type DeleteTokenRequest struct {
 	TokenID string `json:"-"`
 }
 
+// DeleteToken: delete a token
 func (s *API) DeleteToken(req *DeleteTokenRequest, opts ...scw.RequestOption) (*Token, error) {
 	var err error
 

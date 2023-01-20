@@ -576,6 +576,10 @@ const (
 	SnapshotStateError = SnapshotState("error")
 	// SnapshotStateInvalidData is [insert doc].
 	SnapshotStateInvalidData = SnapshotState("invalid_data")
+	// SnapshotStateImporting is [insert doc].
+	SnapshotStateImporting = SnapshotState("importing")
+	// SnapshotStateExporting is [insert doc].
+	SnapshotStateExporting = SnapshotState("exporting")
 )
 
 func (enum SnapshotState) String() string {
@@ -857,14 +861,10 @@ type Bootscript struct {
 
 type CreateIPResponse struct {
 	IP *IP `json:"ip"`
-
-	Location string `json:"Location"`
 }
 
 type CreateImageResponse struct {
 	Image *Image `json:"image"`
-
-	Location string `json:"Location"`
 }
 
 type CreatePlacementGroupResponse struct {
@@ -895,8 +895,6 @@ type CreateSnapshotResponse struct {
 
 type CreateVolumeResponse struct {
 	Volume *Volume `json:"volume"`
-
-	Location string `json:"Location"`
 }
 
 type Dashboard struct {
@@ -917,6 +915,22 @@ type Dashboard struct {
 	SecurityGroupsCount uint32 `json:"security_groups_count"`
 
 	IPsUnused uint32 `json:"ips_unused"`
+
+	VolumesLSSDCount uint32 `json:"volumes_l_ssd_count"`
+
+	VolumesBSSDCount uint32 `json:"volumes_b_ssd_count"`
+
+	VolumesLSSDTotalSize scw.Size `json:"volumes_l_ssd_total_size"`
+
+	VolumesBSSDTotalSize scw.Size `json:"volumes_b_ssd_total_size"`
+
+	PrivateNicsCount uint32 `json:"private_nics_count"`
+
+	PlacementGroupsCount uint32 `json:"placement_groups_count"`
+}
+
+type ExportSnapshotResponse struct {
+	Task *Task `json:"task"`
 }
 
 type GetBootscriptResponse struct {
@@ -1076,10 +1090,12 @@ type ListSecurityGroupRulesResponse struct {
 	Rules []*SecurityGroupRule `json:"rules"`
 }
 
+// ListSecurityGroupsResponse: list security groups response
 type ListSecurityGroupsResponse struct {
-	SecurityGroups []*SecurityGroup `json:"security_groups"`
-
+	// TotalCount: total number of security groups
 	TotalCount uint32 `json:"total_count"`
+	// SecurityGroups: list of security groups
+	SecurityGroups []*SecurityGroup `json:"security_groups"`
 }
 
 type ListServerActionsResponse struct {
@@ -1386,6 +1402,7 @@ type ServerLocation struct {
 }
 
 type ServerMaintenance struct {
+	Reason string `json:"reason"`
 }
 
 type ServerSummary struct {
@@ -1420,6 +1437,16 @@ type ServerType struct {
 	Baremetal bool `json:"baremetal"`
 	// Network: network available for the instance
 	Network *ServerTypeNetwork `json:"network"`
+	// Capabilities: capabilities
+	Capabilities *ServerTypeCapabilities `json:"capabilities"`
+}
+
+// ServerTypeCapabilities: server type. capabilities
+type ServerTypeCapabilities struct {
+	// BlockStorage: true if server supports block storage
+	BlockStorage *bool `json:"block_storage"`
+	// BootTypes: list of supported boot types
+	BootTypes []BootType `json:"boot_types"`
 }
 
 // ServerTypeNetwork: server type. network
@@ -1528,6 +1555,8 @@ type Snapshot struct {
 	ModificationDate *time.Time `json:"modification_date"`
 	// Zone: the snapshot zone
 	Zone scw.Zone `json:"zone"`
+	// ErrorReason: the reason for the failed snapshot import
+	ErrorReason *string `json:"error_reason"`
 }
 
 // SnapshotBaseVolume: snapshot. base volume
@@ -1588,8 +1617,8 @@ type Volume struct {
 	ID string `json:"id"`
 	// Name: the volume name
 	Name string `json:"name"`
-	// ExportURI: show the volume NBD export URI
-	ExportURI string `json:"export_uri"`
+	// Deprecated: ExportURI: show the volume NBD export URI
+	ExportURI *string `json:"export_uri"`
 	// Size: the volume disk size
 	Size scw.Size `json:"size"`
 	// VolumeType: the volume type
@@ -1658,7 +1687,7 @@ type VolumeServerTemplate struct {
 	Boot bool `json:"boot,omitempty"`
 	// Name: name of the volume
 	Name string `json:"name,omitempty"`
-	// Size: disk size of the volume
+	// Size: disk size of the volume, must be a multiple of 512
 	Size scw.Size `json:"size,omitempty"`
 	// VolumeType: type of the volume
 	//
@@ -1690,7 +1719,7 @@ type VolumeTemplate struct {
 	ID string `json:"id,omitempty"`
 	// Name: name of the volume
 	Name string `json:"name,omitempty"`
-	// Size: disk size of the volume
+	// Size: disk size of the volume, must be a multiple of 512
 	Size scw.Size `json:"size,omitempty"`
 	// VolumeType: type of the volume
 	//
@@ -1749,6 +1778,11 @@ type setSnapshotResponse struct {
 
 // Service API
 
+// Zones list localities the api is available in
+func (s *API) Zones() []scw.Zone {
+	return []scw.Zone{scw.ZoneFrPar1, scw.ZoneFrPar2, scw.ZoneFrPar3, scw.ZoneNlAms1, scw.ZoneNlAms2, scw.ZonePlWaw1, scw.ZonePlWaw2}
+}
+
 type GetServerTypesAvailabilityRequest struct {
 	// Zone:
 	//
@@ -1762,7 +1796,7 @@ type GetServerTypesAvailabilityRequest struct {
 
 // GetServerTypesAvailability: get availability
 //
-// Get availibility for all server types.
+// Get availability for all server types.
 func (s *API) GetServerTypesAvailability(req *GetServerTypesAvailabilityRequest, opts ...scw.RequestOption) (*GetServerTypesAvailabilityResponse, error) {
 	var err error
 
@@ -2687,7 +2721,7 @@ type CreateImageRequest struct {
 	// Default value: x86_64
 	Arch Arch `json:"arch"`
 	// DefaultBootscript: default bootscript of the image
-	DefaultBootscript string `json:"default_bootscript,omitempty"`
+	DefaultBootscript *string `json:"default_bootscript,omitempty"`
 	// ExtraVolumes: additional volumes of the image
 	ExtraVolumes map[string]*VolumeTemplate `json:"extra_volumes,omitempty"`
 	// Deprecated: Organization: organization ID of the image
@@ -2699,7 +2733,7 @@ type CreateImageRequest struct {
 	// Tags: the tags of the image
 	Tags []string `json:"tags,omitempty"`
 	// Public: true to create a public image
-	Public bool `json:"public,omitempty"`
+	Public *bool `json:"public,omitempty"`
 }
 
 // CreateImage: create an instance image
@@ -2947,7 +2981,7 @@ type CreateSnapshotRequest struct {
 	// Name: name of the snapshot
 	Name string `json:"name,omitempty"`
 	// VolumeID: UUID of the volume
-	VolumeID string `json:"volume_id,omitempty"`
+	VolumeID *string `json:"volume_id,omitempty"`
 	// Tags: the tags of the snapshot
 	Tags []string `json:"tags,omitempty"`
 	// Deprecated: Organization: organization ID of the snapshot
@@ -2963,9 +2997,15 @@ type CreateSnapshotRequest struct {
 	//
 	// Default value: unknown_volume_type
 	VolumeType SnapshotVolumeType `json:"volume_type"`
+	// Bucket: bucket name for snapshot imports
+	Bucket *string `json:"bucket,omitempty"`
+	// Key: object key for snapshot imports
+	Key *string `json:"key,omitempty"`
+	// Size: imported snapshot size, must be a multiple of 512
+	Size *scw.Size `json:"size,omitempty"`
 }
 
-// CreateSnapshot: create a snapshot from a given volume
+// CreateSnapshot: create a snapshot from a given volume or from a QCOW2 file
 func (s *API) CreateSnapshot(req *CreateSnapshotRequest, opts ...scw.RequestOption) (*CreateSnapshotResponse, error) {
 	var err error
 
@@ -3180,6 +3220,58 @@ func (s *API) DeleteSnapshot(req *DeleteSnapshotRequest, opts ...scw.RequestOpti
 	return nil
 }
 
+type ExportSnapshotRequest struct {
+	// Zone:
+	//
+	// Zone to target. If none is passed will use default zone from the config
+	Zone scw.Zone `json:"-"`
+	// SnapshotID: the snapshot ID
+	SnapshotID string `json:"-"`
+	// Bucket: s3 bucket name
+	Bucket string `json:"bucket,omitempty"`
+	// Key: s3 object key
+	Key string `json:"key,omitempty"`
+}
+
+// ExportSnapshot: export a snapshot
+//
+// Export a snapshot to a given S3 bucket in the same region.
+func (s *API) ExportSnapshot(req *ExportSnapshotRequest, opts ...scw.RequestOption) (*ExportSnapshotResponse, error) {
+	var err error
+
+	if req.Zone == "" {
+		defaultZone, _ := s.client.GetDefaultZone()
+		req.Zone = defaultZone
+	}
+
+	if fmt.Sprint(req.Zone) == "" {
+		return nil, errors.New("field Zone cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.SnapshotID) == "" {
+		return nil, errors.New("field SnapshotID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/instance/v1/zones/" + fmt.Sprint(req.Zone) + "/snapshots/" + fmt.Sprint(req.SnapshotID) + "/export",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ExportSnapshotResponse
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 type ListVolumesRequest struct {
 	// Zone:
 	//
@@ -3269,7 +3361,7 @@ type CreateVolumeRequest struct {
 	//
 	// Default value: l_ssd
 	VolumeType VolumeVolumeType `json:"volume_type"`
-	// Size: the volume disk size
+	// Size: the volume disk size, must be a multiple of 512
 	// Precisely one of BaseSnapshot, BaseVolume, Size must be set.
 	Size *scw.Size `json:"size,omitempty"`
 	// BaseVolume: the ID of the volume on which this volume will be based
@@ -3381,7 +3473,7 @@ type UpdateVolumeRequest struct {
 	Name *string `json:"name,omitempty"`
 	// Tags: the tags of the volume
 	Tags *[]string `json:"tags,omitempty"`
-	// Size: the volume disk size
+	// Size: the volume disk size, must be a multiple of 512
 	Size *scw.Size `json:"size,omitempty"`
 }
 
@@ -4688,8 +4780,12 @@ type ListIPsRequest struct {
 	//
 	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
+	// Project: the project ID the IPs are reserved in
+	Project *string `json:"-"`
 	// Organization: the organization ID the IPs are reserved in
 	Organization *string `json:"-"`
+	// Tags: filter IPs with these exact tags (to filter with several tags, use commas to separate them)
+	Tags []string `json:"-"`
 	// Name: filter on the IP address (Works as a LIKE operation on the IP address)
 	Name *string `json:"-"`
 	// PerPage: a positive integer lower or equal to 100 to select the number of items to return
@@ -4698,10 +4794,6 @@ type ListIPsRequest struct {
 	PerPage *uint32 `json:"-"`
 	// Page: a positive integer to choose the page to return
 	Page *int32 `json:"-"`
-	// Project: the project ID the IPs are reserved in
-	Project *string `json:"-"`
-	// Tags: filter IPs with these exact tags (to filter with several tags, use commas to separate them)
-	Tags []string `json:"-"`
 }
 
 // ListIPs: list all flexible IPs
@@ -4719,14 +4811,14 @@ func (s *API) ListIPs(req *ListIPsRequest, opts ...scw.RequestOption) (*ListIPsR
 	}
 
 	query := url.Values{}
-	parameter.AddToQuery(query, "organization", req.Organization)
-	parameter.AddToQuery(query, "name", req.Name)
-	parameter.AddToQuery(query, "per_page", req.PerPage)
-	parameter.AddToQuery(query, "page", req.Page)
 	parameter.AddToQuery(query, "project", req.Project)
+	parameter.AddToQuery(query, "organization", req.Organization)
 	if len(req.Tags) != 0 {
 		parameter.AddToQuery(query, "tags", strings.Join(req.Tags, ","))
 	}
+	parameter.AddToQuery(query, "name", req.Name)
+	parameter.AddToQuery(query, "per_page", req.PerPage)
+	parameter.AddToQuery(query, "page", req.Page)
 
 	if fmt.Sprint(req.Zone) == "" {
 		return nil, errors.New("field Zone cannot be empty in request")
@@ -4949,7 +5041,7 @@ type ListPrivateNICsRequest struct {
 	//
 	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
-
+	// ServerID: the server the private NIC is attached to
 	ServerID string `json:"-"`
 }
 
@@ -4992,9 +5084,9 @@ type CreatePrivateNICRequest struct {
 	//
 	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
-
+	// ServerID: UUID of the server the private NIC will be attached to
 	ServerID string `json:"-"`
-
+	// PrivateNetworkID: UUID of the private network where the private NIC will be attached
 	PrivateNetworkID string `json:"private_network_id,omitempty"`
 }
 
@@ -5042,9 +5134,9 @@ type GetPrivateNICRequest struct {
 	//
 	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
-
+	// ServerID: the server the private NIC is attached to
 	ServerID string `json:"-"`
-
+	// PrivateNicID: the private NIC unique ID
 	PrivateNicID string `json:"-"`
 }
 
@@ -5091,9 +5183,9 @@ type DeletePrivateNICRequest struct {
 	//
 	// Zone to target. If none is passed will use default zone from the config
 	Zone scw.Zone `json:"-"`
-
+	// ServerID: the server the private NIC is attached to
 	ServerID string `json:"-"`
-
+	// PrivateNicID: the private NIC unique ID
 	PrivateNicID string `json:"-"`
 }
 

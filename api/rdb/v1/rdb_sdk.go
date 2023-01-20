@@ -936,13 +936,13 @@ type Endpoint struct {
 	Port uint32 `json:"port"`
 	// Name: name of the endpoint
 	Name *string `json:"name"`
-	// PrivateNetwork: private network details
+	// PrivateNetwork: private network details. One at the most per RDB instance or read replica (an RDB instance and its read replica can have different private networks). Cannot be updated (has to be deleted and recreated)
 	// Precisely one of DirectAccess, LoadBalancer, PrivateNetwork must be set.
 	PrivateNetwork *EndpointPrivateNetworkDetails `json:"private_network,omitempty"`
-	// LoadBalancer: load balancer details
+	// LoadBalancer: load balancer details. Public endpoint for RDB instances which is systematically present. One per RDB instance
 	// Precisely one of DirectAccess, LoadBalancer, PrivateNetwork must be set.
 	LoadBalancer *EndpointLoadBalancerDetails `json:"load_balancer,omitempty"`
-	// DirectAccess: direct access details
+	// DirectAccess: direct access details. Public endpoint reserved for read replicas. One per read replica
 	// Precisely one of DirectAccess, LoadBalancer, PrivateNetwork must be set.
 	DirectAccess *EndpointDirectAccessDetails `json:"direct_access,omitempty"`
 	// Hostname: hostname of the endpoint
@@ -968,10 +968,10 @@ type EndpointPrivateNetworkDetails struct {
 
 // EndpointSpec: endpoint spec
 type EndpointSpec struct {
-	// LoadBalancer: load balancer endpoint specifications
+	// LoadBalancer: load balancer endpoint specifications. Public endpoint for RDB instances which is systematically present. One per RDB instance
 	// Precisely one of LoadBalancer, PrivateNetwork must be set.
 	LoadBalancer *EndpointSpecLoadBalancer `json:"load_balancer,omitempty"`
-	// PrivateNetwork: private network endpoint specifications
+	// PrivateNetwork: private network endpoint specifications. One at the most per RDB instance or read replica (an RDB instance and its read replica can have different private networks). Cannot be updated (has to be deleted and recreated)
 	// Precisely one of LoadBalancer, PrivateNetwork must be set.
 	PrivateNetwork *EndpointSpecPrivateNetwork `json:"private_network,omitempty"`
 }
@@ -1055,6 +1055,8 @@ type Instance struct {
 	Status InstanceStatus `json:"status"`
 	// Engine: database engine of the database (PostgreSQL, MySQL, ...)
 	Engine string `json:"engine"`
+	// UpgradableVersion: available database engine versions for upgrade
+	UpgradableVersion []*UpgradableVersion `json:"upgradable_version"`
 	// Deprecated: Endpoint: endpoint of the instance
 	Endpoint *Endpoint `json:"endpoint,omitempty"`
 	// Tags: list of tags applied to the instance
@@ -1065,6 +1067,8 @@ type Instance struct {
 	BackupSchedule *BackupSchedule `json:"backup_schedule"`
 	// IsHaCluster: whether or not High-Availability is enabled
 	IsHaCluster bool `json:"is_ha_cluster"`
+	// ReadReplicas: read replicas of the instance
+	ReadReplicas []*ReadReplica `json:"read_replicas"`
 	// NodeType: node type of the instance
 	NodeType string `json:"node_type"`
 	// InitSettings: list of engine settings to be set at database initialisation
@@ -1249,6 +1253,8 @@ type NodeType struct {
 	Beta bool `json:"beta"`
 	// AvailableVolumeTypes: available storage options for the Node Type
 	AvailableVolumeTypes []*NodeTypeVolumeType `json:"available_volume_types"`
+	// IsHaRequired: the Node Type can be used only with high availability option
+	IsHaRequired bool `json:"is_ha_required"`
 	// Region: region the Node Type is in
 	Region scw.Region `json:"region"`
 }
@@ -1295,6 +1301,41 @@ type Privilege struct {
 	UserName string `json:"user_name"`
 }
 
+// ReadReplica: read replica
+type ReadReplica struct {
+	// ID: UUID of the read replica
+	ID string `json:"id"`
+	// Endpoints: display read replica connection information
+	Endpoints []*Endpoint `json:"endpoints"`
+	// Status: read replica status
+	//
+	// Default value: unknown
+	Status ReadReplicaStatus `json:"status"`
+	// Region: region the read replica is in
+	Region scw.Region `json:"region"`
+}
+
+// ReadReplicaEndpointSpec: read replica endpoint spec
+type ReadReplicaEndpointSpec struct {
+	// DirectAccess: direct access endpoint specifications. Public endpoint reserved for read replicas. One per read replica
+	// Precisely one of DirectAccess, PrivateNetwork must be set.
+	DirectAccess *ReadReplicaEndpointSpecDirectAccess `json:"direct_access,omitempty"`
+	// PrivateNetwork: private network endpoint specifications. One at the most per read replica. Cannot be updated (has to be deleted and recreated)
+	// Precisely one of DirectAccess, PrivateNetwork must be set.
+	PrivateNetwork *ReadReplicaEndpointSpecPrivateNetwork `json:"private_network,omitempty"`
+}
+
+type ReadReplicaEndpointSpecDirectAccess struct {
+}
+
+// ReadReplicaEndpointSpecPrivateNetwork: read replica endpoint spec. private network
+type ReadReplicaEndpointSpecPrivateNetwork struct {
+	// PrivateNetworkID: UUID of the private network to be connected to the read replica
+	PrivateNetworkID string `json:"private_network_id"`
+	// ServiceIP: endpoint IPv4 adress with a CIDR notation. Check documentation about IP and subnet limitations.
+	ServiceIP scw.IPNet `json:"service_ip"`
+}
+
 // SetInstanceACLRulesResponse: set instance acl rules response
 type SetInstanceACLRulesResponse struct {
 	// Rules: aCLs rules configured for an instance
@@ -1335,6 +1376,16 @@ type Snapshot struct {
 	Region scw.Region `json:"region"`
 }
 
+type UpgradableVersion struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Version string `json:"version"`
+
+	MinorVersion string `json:"minor_version"`
+}
+
 // User: user
 type User struct {
 	// Name: name of the user (Length must be between 1 and 63 characters, First character must be an alphabet character (a-zA-Z), Your Username cannot start with '_rdb', Only a-zA-Z0-9_$- characters are accepted)
@@ -1354,11 +1405,20 @@ type Volume struct {
 
 // Service API
 
+// Regions list localities the api is available in
+func (s *API) Regions() []scw.Region {
+	return []scw.Region{scw.RegionFrPar, scw.RegionNlAms, scw.RegionPlWaw}
+}
+
 type ListDatabaseEnginesRequest struct {
 	// Region:
 	//
 	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
+	// Name: name of the Database Engine
+	Name *string `json:"-"`
+	// Version: version of the Database Engine
+	Version *string `json:"-"`
 
 	Page *int32 `json:"-"`
 
@@ -1380,6 +1440,8 @@ func (s *API) ListDatabaseEngines(req *ListDatabaseEnginesRequest, opts ...scw.R
 	}
 
 	query := url.Values{}
+	parameter.AddToQuery(query, "name", req.Name)
+	parameter.AddToQuery(query, "version", req.Version)
 	parameter.AddToQuery(query, "page", req.Page)
 	parameter.AddToQuery(query, "page_size", req.PageSize)
 
@@ -1809,24 +1871,29 @@ type UpgradeInstanceRequest struct {
 	// InstanceID: UUID of the instance you want to upgrade
 	InstanceID string `json:"-"`
 	// NodeType: node type of the instance you want to upgrade to
-	// Precisely one of EnableHa, NodeType, VolumeSize, VolumeType must be set.
+	// Precisely one of EnableHa, NodeType, UpgradableVersionID, VolumeSize, VolumeType must be set.
 	NodeType *string `json:"node_type,omitempty"`
 	// EnableHa: set to true to enable high availability on your instance
-	// Precisely one of EnableHa, NodeType, VolumeSize, VolumeType must be set.
+	// Precisely one of EnableHa, NodeType, UpgradableVersionID, VolumeSize, VolumeType must be set.
 	EnableHa *bool `json:"enable_ha,omitempty"`
 	// VolumeSize: increase your block storage volume size
-	// Precisely one of EnableHa, NodeType, VolumeSize, VolumeType must be set.
+	// Precisely one of EnableHa, NodeType, UpgradableVersionID, VolumeSize, VolumeType must be set.
 	VolumeSize *uint64 `json:"volume_size,omitempty"`
 	// VolumeType: change your instance storage type
 	//
 	// Default value: lssd
-	// Precisely one of EnableHa, NodeType, VolumeSize, VolumeType must be set.
+	// Precisely one of EnableHa, NodeType, UpgradableVersionID, VolumeSize, VolumeType must be set.
 	VolumeType *VolumeType `json:"volume_type,omitempty"`
+	// UpgradableVersionID: update your instance database engine to a newer version
+	//
+	// This will create a new Database Instance with same instance specification as the current one and perform a Database Engine upgrade.
+	// Precisely one of EnableHa, NodeType, UpgradableVersionID, VolumeSize, VolumeType must be set.
+	UpgradableVersionID *string `json:"upgradable_version_id,omitempty"`
 }
 
-// UpgradeInstance: upgrade an instance to an higher instance type
+// UpgradeInstance: upgrade an instance
 //
-// Upgrade your current `node_type` or enable high availability on your standalone database instance.
+// Upgrade your current instance specifications like node type, high availability, volume, or db engine version.
 func (s *API) UpgradeInstance(req *UpgradeInstanceRequest, opts ...scw.RequestOption) (*Instance, error) {
 	var err error
 
@@ -2005,7 +2072,7 @@ type CreateInstanceRequest struct {
 	VolumeType VolumeType `json:"volume_type"`
 	// VolumeSize: volume size when volume_type is not lssd
 	VolumeSize scw.Size `json:"volume_size"`
-	// InitEndpoints: one or multiple EndpointSpec used to expose your database instance
+	// InitEndpoints: one or multiple EndpointSpec used to expose your database instance. A load_balancer public endpoint is systematically created
 	InitEndpoints []*EndpointSpec `json:"init_endpoints"`
 	// BackupSameRegion: store logical backups in the same region as the database instance
 	BackupSameRegion bool `json:"backup_same_region"`
@@ -2387,6 +2454,235 @@ func (s *API) GetInstanceMetrics(req *GetInstanceMetricsRequest, opts ...scw.Req
 	}
 
 	var resp InstanceMetrics
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type CreateReadReplicaRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+	// InstanceID: UUID of the instance you want a read replica of
+	InstanceID string `json:"instance_id"`
+	// EndpointSpec: specification of the endpoint you want to create
+	EndpointSpec []*ReadReplicaEndpointSpec `json:"endpoint_spec"`
+}
+
+// CreateReadReplica: create a read replica
+//
+// You can only create a maximum of 3 read replicas for one instance.
+func (s *API) CreateReadReplica(req *CreateReadReplicaRequest, opts ...scw.RequestOption) (*ReadReplica, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/rdb/v1/regions/" + fmt.Sprint(req.Region) + "/read-replicas",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ReadReplica
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type GetReadReplicaRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+	// ReadReplicaID: UUID of the read replica
+	ReadReplicaID string `json:"-"`
+}
+
+// GetReadReplica: get a read replica
+func (s *API) GetReadReplica(req *GetReadReplicaRequest, opts ...scw.RequestOption) (*ReadReplica, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.ReadReplicaID) == "" {
+		return nil, errors.New("field ReadReplicaID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "GET",
+		Path:    "/rdb/v1/regions/" + fmt.Sprint(req.Region) + "/read-replicas/" + fmt.Sprint(req.ReadReplicaID) + "",
+		Headers: http.Header{},
+	}
+
+	var resp ReadReplica
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type DeleteReadReplicaRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+	// ReadReplicaID: UUID of the read replica
+	ReadReplicaID string `json:"-"`
+}
+
+// DeleteReadReplica: delete a read replica
+func (s *API) DeleteReadReplica(req *DeleteReadReplicaRequest, opts ...scw.RequestOption) (*ReadReplica, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.ReadReplicaID) == "" {
+		return nil, errors.New("field ReadReplicaID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "DELETE",
+		Path:    "/rdb/v1/regions/" + fmt.Sprint(req.Region) + "/read-replicas/" + fmt.Sprint(req.ReadReplicaID) + "",
+		Headers: http.Header{},
+	}
+
+	var resp ReadReplica
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type ResetReadReplicaRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+	// ReadReplicaID: UUID of the read replica
+	ReadReplicaID string `json:"-"`
+}
+
+// ResetReadReplica: resync a read replica
+//
+// When you resync a read replica, first it is reset, and then its data is resynchronized from the primary node.
+// Your read replica will be unavailable during the resync process. The duration of this process is proportional to your Database Instance size.
+// The configured endpoints will not change.
+//
+func (s *API) ResetReadReplica(req *ResetReadReplicaRequest, opts ...scw.RequestOption) (*ReadReplica, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.ReadReplicaID) == "" {
+		return nil, errors.New("field ReadReplicaID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/rdb/v1/regions/" + fmt.Sprint(req.Region) + "/read-replicas/" + fmt.Sprint(req.ReadReplicaID) + "/reset",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ReadReplica
+
+	err = s.client.Do(scwReq, &resp, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+type CreateReadReplicaEndpointRequest struct {
+	// Region:
+	//
+	// Region to target. If none is passed will use default region from the config
+	Region scw.Region `json:"-"`
+	// ReadReplicaID: UUID of the read replica
+	ReadReplicaID string `json:"-"`
+	// EndpointSpec: specification of the endpoint you want to create
+	EndpointSpec []*ReadReplicaEndpointSpec `json:"endpoint_spec"`
+}
+
+// CreateReadReplicaEndpoint: create a new endpoint for a given read replica
+//
+// A read replica can have at most one direct access and one private network endpoint.
+func (s *API) CreateReadReplicaEndpoint(req *CreateReadReplicaEndpointRequest, opts ...scw.RequestOption) (*ReadReplica, error) {
+	var err error
+
+	if req.Region == "" {
+		defaultRegion, _ := s.client.GetDefaultRegion()
+		req.Region = defaultRegion
+	}
+
+	if fmt.Sprint(req.Region) == "" {
+		return nil, errors.New("field Region cannot be empty in request")
+	}
+
+	if fmt.Sprint(req.ReadReplicaID) == "" {
+		return nil, errors.New("field ReadReplicaID cannot be empty in request")
+	}
+
+	scwReq := &scw.ScalewayRequest{
+		Method:  "POST",
+		Path:    "/rdb/v1/regions/" + fmt.Sprint(req.Region) + "/read-replicas/" + fmt.Sprint(req.ReadReplicaID) + "/endpoints",
+		Headers: http.Header{},
+	}
+
+	err = scwReq.SetBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp ReadReplica
 
 	err = s.client.Do(scwReq, &resp, opts...)
 	if err != nil {
@@ -3827,6 +4123,8 @@ type DeleteEndpointRequest struct {
 	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
 	// EndpointID: UUID of the endpoint you want to delete
+	//
+	// This endpoint can also be used to delete a read replica endpoint.
 	EndpointID string `json:"-"`
 }
 

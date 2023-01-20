@@ -245,7 +245,7 @@ type FlexibleIP struct {
 	// Default value: unknown
 	Status FlexibleIPStatus `json:"status"`
 	// IPAddress: IP of the Flexible IP
-	IPAddress net.IP `json:"ip_address"`
+	IPAddress scw.IPNet `json:"ip_address"`
 	// MacAddress: mAC address of the Flexible IP
 	MacAddress *MACAddress `json:"mac_address"`
 	// ServerID: ID of the server linked to the Flexible IP
@@ -287,6 +287,11 @@ type MACAddress struct {
 }
 
 // Service API
+
+// Zones list localities the api is available in
+func (s *API) Zones() []scw.Zone {
+	return []scw.Zone{scw.ZoneFrPar1, scw.ZoneFrPar2, scw.ZoneNlAms1}
+}
 
 type CreateFlexibleIPRequest struct {
 	// Zone:

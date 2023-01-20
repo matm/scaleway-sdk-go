@@ -694,12 +694,16 @@ type DeviceMessageFilters struct {
 	Subscribe *DeviceMessageFiltersRule `json:"subscribe"`
 }
 
+// DeviceMessageFiltersRule: device. message filters. rule
 type DeviceMessageFiltersRule struct {
-	// Policy:
+	// Policy: how to use the topic list
+	//
+	// If accept, the set will accept all topics in the topics list, but no other.
+	// If reject, the set will deny all topics in the topics list, but all others will be allowed.
 	//
 	// Default value: unknown
 	Policy DeviceMessageFiltersRulePolicy `json:"policy"`
-
+	// Topics: list of topics to accept or reject. It must be valid MQTT topics and up to 65535 characters
 	Topics *[]string `json:"topics"`
 }
 
@@ -966,7 +970,7 @@ type TwinDocument struct {
 	// Version: document's new version
 	Version uint32 `json:"version"`
 	// Data: document's new data
-	Data []byte `json:"data"`
+	Data *scw.JSONObject `json:"data"`
 }
 
 type UpdateRouteRequestDatabaseConfig struct {
@@ -1011,6 +1015,11 @@ type UpdateRouteRequestS3Config struct {
 }
 
 // Service API
+
+// Regions list localities the api is available in
+func (s *API) Regions() []scw.Region {
+	return []scw.Region{scw.RegionFrPar}
+}
 
 type ListHubsRequest struct {
 	// Region:
@@ -1389,7 +1398,7 @@ type GetHubMetricsRequest struct {
 	StartDate *time.Time `json:"-"`
 }
 
-// GetHubMetrics: get a hub's metrics
+// Deprecated: GetHubMetrics: get a hub's metrics
 func (s *API) GetHubMetrics(req *GetHubMetricsRequest, opts ...scw.RequestOption) (*GetHubMetricsResponse, error) {
 	var err error
 
@@ -2016,7 +2025,7 @@ type GetDeviceMetricsRequest struct {
 	StartDate *time.Time `json:"-"`
 }
 
-// GetDeviceMetrics: get a device's metrics
+// Deprecated: GetDeviceMetrics: get a device's metrics
 func (s *API) GetDeviceMetrics(req *GetDeviceMetricsRequest, opts ...scw.RequestOption) (*GetDeviceMetricsResponse, error) {
 	var err error
 
@@ -2582,7 +2591,7 @@ type PutTwinDocumentRequest struct {
 	// Data: new document data
 	//
 	// The new data that will replace the contents of the document.
-	Data []byte `json:"data"`
+	Data *scw.JSONObject `json:"data"`
 }
 
 // PutTwinDocument: bETA - Update a Cloud Twin Document
@@ -2648,7 +2657,7 @@ type PatchTwinDocumentRequest struct {
 	// * If the patch object property is a value (number, strings, bool, arrays), it is replaced.
 	// * If the patch object property is an object, the previous rules will be applied recursively on it.
 	//
-	Data []byte `json:"data"`
+	Data *scw.JSONObject `json:"data"`
 }
 
 // PatchTwinDocument: bETA - Patch a Cloud Twin Document

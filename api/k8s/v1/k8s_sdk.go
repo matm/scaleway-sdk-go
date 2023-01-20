@@ -440,6 +440,10 @@ const (
 	NodeStatusCreationError = NodeStatus("creation_error")
 	// NodeStatusUpgrading is [insert doc].
 	NodeStatusUpgrading = NodeStatus("upgrading")
+	// NodeStatusStarting is [insert doc].
+	NodeStatusStarting = NodeStatus("starting")
+	// NodeStatusRegistering is [insert doc].
+	NodeStatusRegistering = NodeStatus("registering")
 )
 
 func (enum NodeStatus) String() string {
@@ -786,6 +790,8 @@ type CreateClusterRequestPoolConfig struct {
 	// Name: the name of the pool
 	Name string `json:"name"`
 	// NodeType: the node type is the type of Scaleway Instance wanted for the pool
+	//
+	// The node type is the type of Scaleway Instance wanted for the pool. Nodes with insufficient memory are not eligible (DEV1-S, PLAY2-PICO, STARDUST). 'external' is a special node type used to provision instances from other cloud providers.
 	NodeType string `json:"node_type"`
 	// PlacementGroupID: the placement group ID in which all the nodes of the pool will be created
 	PlacementGroupID *string `json:"placement_group_id"`
@@ -793,17 +799,17 @@ type CreateClusterRequestPoolConfig struct {
 	Autoscaling bool `json:"autoscaling"`
 	// Size: the size (number of nodes) of the pool
 	Size uint32 `json:"size"`
-	// MinSize: the minimun size of the pool
+	// MinSize: the minimum size of the pool
 	//
-	// The minimun size of the pool. Note that this fields will be used only when autoscaling is enabled.
+	// The minimum size of the pool. Note that this field will be used only when autoscaling is enabled.
 	MinSize *uint32 `json:"min_size"`
 	// MaxSize: the maximum size of the pool
 	//
-	// The maximum size of the pool. Note that this fields will be used only when autoscaling is enabled.
+	// The maximum size of the pool. Note that this field will be used only when autoscaling is enabled.
 	MaxSize *uint32 `json:"max_size"`
 	// ContainerRuntime: the container runtime for the nodes of the pool
 	//
-	// The customization of the container runtime is available for each pool. Note that `docker` is the only supporter runtime at the moment. Others are to be considered experimental.
+	// The customization of the container runtime is available for each pool. Note that `docker` is deprecated since 1.20 and will be removed in 1.24.
 	//
 	// Default value: unknown_runtime
 	ContainerRuntime Runtime `json:"container_runtime"`
@@ -823,7 +829,7 @@ type CreateClusterRequestPoolConfig struct {
 	//   - `l_ssd` is a local block storage: your system is stored locally on
 	//     the hypervisor of your node.
 	//   - `b_ssd` is a remote block storage: your system is stored on a
-	//     centralised and resilant cluster.
+	//     centralised and resilient cluster.
 	//
 	// Default value: default_volume_type
 	RootVolumeType PoolVolumeType `json:"root_volume_type"`
@@ -899,22 +905,28 @@ type Node struct {
 	PoolID string `json:"pool_id"`
 	// ClusterID: the cluster ID of the node
 	ClusterID string `json:"cluster_id"`
+	// ProviderID: the underlying instance ID
+	//
+	// It is prefixed by instance type and location information (see https://pkg.go.dev/k8s.io/api/core/v1#NodeSpec.ProviderID).
+	ProviderID string `json:"provider_id"`
 	// Region: the cluster region of the node
 	Region scw.Region `json:"region"`
 	// Name: the name of the node
 	Name string `json:"name"`
-	// PublicIPV4: the public IPv4 address of the node
-	PublicIPV4 *net.IP `json:"public_ip_v4"`
-	// PublicIPV6: the public IPv6 address of the node
-	PublicIPV6 *net.IP `json:"public_ip_v6"`
-	// Conditions: the conditions of the node
+	// Deprecated: PublicIPV4: the public IPv4 address of the node
+	PublicIPV4 *net.IP `json:"public_ip_v4,omitempty"`
+	// Deprecated: PublicIPV6: the public IPv6 address of the node
+	PublicIPV6 *net.IP `json:"public_ip_v6,omitempty"`
+	// Deprecated: Conditions: the conditions of the node
 	//
 	// These conditions contains the Node Problem Detector conditions, as well as some in house conditions.
-	Conditions map[string]string `json:"conditions"`
+	Conditions *map[string]string `json:"conditions,omitempty"`
 	// Status: the status of the node
 	//
 	// Default value: unknown
 	Status NodeStatus `json:"status"`
+	// ErrorMessage: details of the error, if any occured when managing the node
+	ErrorMessage *string `json:"error_message"`
 	// CreatedAt: the date at which the node was created
 	CreatedAt *time.Time `json:"created_at"`
 	// UpdatedAt: the date at which the node was last updated
@@ -940,22 +952,24 @@ type Pool struct {
 	// Version: the version of the pool
 	Version string `json:"version"`
 	// NodeType: the node type is the type of Scaleway Instance wanted for the pool
+	//
+	// The node type is the type of Scaleway Instance wanted for the pool. Nodes with insufficient memory are not eligible (DEV1-S, PLAY2-PICO, STARDUST). 'external' is a special node type used to provision instances from other cloud providers.
 	NodeType string `json:"node_type"`
 	// Autoscaling: the enablement of the autoscaling feature for the pool
 	Autoscaling bool `json:"autoscaling"`
 	// Size: the size (number of nodes) of the pool
 	Size uint32 `json:"size"`
-	// MinSize: the minimun size of the pool
+	// MinSize: the minimum size of the pool
 	//
-	// The minimun size of the pool. Note that this fields will be used only when autoscaling is enabled.
+	// The minimum size of the pool. Note that this field will be used only when autoscaling is enabled.
 	MinSize uint32 `json:"min_size"`
 	// MaxSize: the maximum size of the pool
 	//
-	// The maximum size of the pool. Note that this fields will be used only when autoscaling is enabled.
+	// The maximum size of the pool. Note that this field will be used only when autoscaling is enabled.
 	MaxSize uint32 `json:"max_size"`
 	// ContainerRuntime: the container runtime for the nodes of the pool
 	//
-	// The customization of the container runtime is available for each pool. Note that `docker` is the only supporter runtime at the moment. Others are to be considered experimental.
+	// The customization of the container runtime is available for each pool. Note that `docker` is deprecated since 1.20 and will be removed in 1.24.
 	//
 	// Default value: unknown_runtime
 	ContainerRuntime Runtime `json:"container_runtime"`
@@ -977,7 +991,7 @@ type Pool struct {
 	//   - `l_ssd` is a local block storage: your system is stored locally on
 	//     the hypervisor of your node.
 	//   - `b_ssd` is a remote block storage: your system is stored on a
-	//     centralised and resilant cluster.
+	//     centralised and resilient cluster.
 	//
 	// Default value: default_volume_type
 	RootVolumeType PoolVolumeType `json:"root_volume_type"`
@@ -1080,8 +1094,8 @@ type Version struct {
 	Region scw.Region `json:"region"`
 	// AvailableCnis: the supported Container Network Interface (CNI) plugins for this version
 	AvailableCnis []CNI `json:"available_cnis"`
-	// AvailableIngresses: the supported Ingress Controllers for this version
-	AvailableIngresses []Ingress `json:"available_ingresses"`
+	// Deprecated: AvailableIngresses: the supported Ingress Controllers for this version
+	AvailableIngresses *[]Ingress `json:"available_ingresses,omitempty"`
 	// AvailableContainerRuntimes: the supported container runtimes for this version
 	AvailableContainerRuntimes []Runtime `json:"available_container_runtimes"`
 	// AvailableFeatureGates: the supported feature gates for this version
@@ -1093,6 +1107,11 @@ type Version struct {
 }
 
 // Service API
+
+// Regions list localities the api is available in
+func (s *API) Regions() []scw.Region {
+	return []scw.Region{scw.RegionFrPar, scw.RegionNlAms, scw.RegionPlWaw}
+}
 
 type ListClustersRequest struct {
 	// Region:
@@ -1179,6 +1198,8 @@ type CreateClusterRequest struct {
 	// Precisely one of OrganizationID, ProjectID must be set.
 	ProjectID *string `json:"project_id,omitempty"`
 	// Type: the type of the cluster
+	//
+	// The type of the cluster (possible values are kapsule, multicloud).
 	Type string `json:"type"`
 	// Name: the name of the cluster
 	Name string `json:"name"`
@@ -1204,9 +1225,9 @@ type CreateClusterRequest struct {
 	//
 	// This field allows to specify some configuration for the autoscaler, which is an implementation of the [cluster-autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler/).
 	AutoscalerConfig *CreateClusterRequestAutoscalerConfig `json:"autoscaler_config"`
-	// AutoUpgrade: the auo upgrade configuration of the cluster
+	// AutoUpgrade: the auto upgrade configuration of the cluster
 	//
-	// This configuratiom enables to set a speicific 2-hour time window in which the cluster can be automatically updated to the latest patch version in the current minor one.
+	// This configuration enables to set a specific 2-hour time window in which the cluster can be automatically updated to the latest patch version in the current minor one.
 	AutoUpgrade *CreateClusterRequestAutoUpgrade `json:"auto_upgrade"`
 	// FeatureGates: list of feature gates to enable
 	FeatureGates []string `json:"feature_gates"`
@@ -1337,9 +1358,9 @@ type UpdateClusterRequest struct {
 	//
 	// Default value: unknown_ingress
 	Ingress *Ingress `json:"ingress,omitempty"`
-	// AutoUpgrade: the new auo upgrade configuration of the cluster
+	// AutoUpgrade: the new auto upgrade configuration of the cluster
 	//
-	// The new auo upgrade configuration of the cluster. Note that all the fields needs to be set.
+	// The new auto upgrade configuration of the cluster. Note that all fields need to be set.
 	AutoUpgrade *UpdateClusterRequestAutoUpgrade `json:"auto_upgrade"`
 	// FeatureGates: list of feature gates to enable
 	FeatureGates *[]string `json:"feature_gates"`
@@ -1710,6 +1731,8 @@ type CreatePoolRequest struct {
 	// Name: the name of the pool
 	Name string `json:"name"`
 	// NodeType: the node type is the type of Scaleway Instance wanted for the pool
+	//
+	// The node type is the type of Scaleway Instance wanted for the pool. Nodes with insufficient memory are not eligible (DEV1-S, PLAY2-PICO, STARDUST). 'external' is a special node type used to provision instances from other cloud providers.
 	NodeType string `json:"node_type"`
 	// PlacementGroupID: the placement group ID in which all the nodes of the pool will be created
 	PlacementGroupID *string `json:"placement_group_id"`
@@ -1717,17 +1740,17 @@ type CreatePoolRequest struct {
 	Autoscaling bool `json:"autoscaling"`
 	// Size: the size (number of nodes) of the pool
 	Size uint32 `json:"size"`
-	// MinSize: the minimun size of the pool
+	// MinSize: the minimum size of the pool
 	//
-	// The minimun size of the pool. Note that this fields will be used only when autoscaling is enabled.
+	// The minimum size of the pool. Note that this field will be used only when autoscaling is enabled.
 	MinSize *uint32 `json:"min_size"`
 	// MaxSize: the maximum size of the pool
 	//
-	// The maximum size of the pool. Note that this fields will be used only when autoscaling is enabled.
+	// The maximum size of the pool. Note that this field will be used only when autoscaling is enabled.
 	MaxSize *uint32 `json:"max_size"`
 	// ContainerRuntime: the container runtime for the nodes of the pool
 	//
-	// The customization of the container runtime is available for each pool. Note that `docker` is the only supporter runtime at the moment. Others are to be considered experimental.
+	// The customization of the container runtime is available for each pool. Note that `docker` is deprecated since 1.20 and will be removed in 1.24.
 	//
 	// Default value: unknown_runtime
 	ContainerRuntime Runtime `json:"container_runtime"`
@@ -1747,7 +1770,7 @@ type CreatePoolRequest struct {
 	//   - `l_ssd` is a local block storage: your system is stored locally on
 	//     the hypervisor of your node.
 	//   - `b_ssd` is a remote block storage: your system is stored on a
-	//     centralised and resilant cluster.
+	//     centralised and resilient cluster.
 	//
 	// Default value: default_volume_type
 	RootVolumeType PoolVolumeType `json:"root_volume_type"`
@@ -2128,7 +2151,7 @@ type ReplaceNodeRequest struct {
 	NodeID string `json:"-"`
 }
 
-// ReplaceNode: replace a node in a cluster
+// Deprecated: ReplaceNode: replace a node in a cluster
 //
 // This method allows to replace a specific node. The node will be set cordoned, meaning that scheduling will be disabled. Then the existing pods on the node will be drained and reschedule onto another schedulable node. Then the node will be deleted, and a new one will be created after the deletion. Note that when there is not enough space to reschedule all the pods (in a one node cluster for instance), you may experience some disruption of your applications.
 func (s *API) ReplaceNode(req *ReplaceNodeRequest, opts ...scw.RequestOption) (*Node, error) {
@@ -2220,10 +2243,17 @@ type DeleteNodeRequest struct {
 	//
 	// Region to target. If none is passed will use default region from the config
 	Region scw.Region `json:"-"`
-
+	// NodeID: the ID of the node to replace
 	NodeID string `json:"-"`
+	// SkipDrain: skip draining node from its workload
+	SkipDrain bool `json:"-"`
+	// Replace: add a new node after the deletion of this node
+	Replace bool `json:"-"`
 }
 
+// DeleteNode: delete a node in a cluster
+//
+// This method allows to delete a specific node. Note that when there is not enough space to reschedule all the pods (in a one node cluster for instance), you may experience some disruption of your applications.
 func (s *API) DeleteNode(req *DeleteNodeRequest, opts ...scw.RequestOption) (*Node, error) {
 	var err error
 
@@ -2231,6 +2261,10 @@ func (s *API) DeleteNode(req *DeleteNodeRequest, opts ...scw.RequestOption) (*No
 		defaultRegion, _ := s.client.GetDefaultRegion()
 		req.Region = defaultRegion
 	}
+
+	query := url.Values{}
+	parameter.AddToQuery(query, "skip_drain", req.SkipDrain)
+	parameter.AddToQuery(query, "replace", req.Replace)
 
 	if fmt.Sprint(req.Region) == "" {
 		return nil, errors.New("field Region cannot be empty in request")
@@ -2243,6 +2277,7 @@ func (s *API) DeleteNode(req *DeleteNodeRequest, opts ...scw.RequestOption) (*No
 	scwReq := &scw.ScalewayRequest{
 		Method:  "DELETE",
 		Path:    "/k8s/v1/regions/" + fmt.Sprint(req.Region) + "/nodes/" + fmt.Sprint(req.NodeID) + "",
+		Query:   query,
 		Headers: http.Header{},
 	}
 
